@@ -14,6 +14,8 @@ def parse_mem_lat(filepath):
     if not data_lines:
         return []
 
+    # Headers are hardcoded due to the multi-line and complex nature of the original header.
+    # This approach is simpler than trying to parse the two-line header.
     headers = [
         "DIE",
         "total-latency-cycles",
@@ -23,18 +25,17 @@ def parse_mem_lat(filepath):
 
     parsed_data = []
     for line in data_lines:
-        # Split the line into parts based on whitespace
-        parts = re.split(r'\s{2,}', line.strip())
+        # Split line by multiple spaces
+        values = re.split(r'\s{2,}', line.strip())
 
-        row = {}
-        # Assign parts to headers
+        row_data = {}
         for i, header in enumerate(headers):
-            if i < len(parts):
-                row[header] = parts[i]
+            if i < len(values):
+                row_data[header] = values[i]
             else:
-                row[header] = "" # Assign empty string if no more parts
+                row_data[header] = ""
 
-        parsed_data.append(row)
+        parsed_data.append(row_data)
 
     return parsed_data
 
@@ -43,12 +44,8 @@ def main():
     parser.add_argument('filepath', help='The path to the file to parse.')
     args = parser.parse_args()
 
-    try:
-        data = parse_mem_lat(args.filepath)
-        if data:
-            print(json.dumps(data, indent=2))
-    except Exception as e:
-        print(f"Error parsing file: {e}", file=sys.stderr)
+    data = parse_mem_lat(args.filepath)
+    print(json.dumps(data, indent=2))
 
 if __name__ == '__main__':
     main()

@@ -1,18 +1,14 @@
 [
   {
-    "Socket": "Socke",
-    "Category": "t0",
-    "IO": "74",
-    "DIE0": "B/s",
-    "DIE1": "B/s           2",
-    "DIE2": "MB/s"
+    "Category": "Socket0",
+    "IO DIE0": "0  B/s",
+    "IO DIE1": "0  B/s",
+    "IO DIE2": "274 MB/s"
   },
   {
-    "Socket": "Socke",
-    "Category": "t1",
-    "IO": "21",
-    "DIE0": "B/s",
-    "DIE1": "B/s",
-    "DIE2": "MB/s"
+    "Category": "Socket1",
+    "IO DIE0": "0  B/s",
+    "IO DIE1": "0  B/s",
+    "IO DIE2": "21 MB/s"
   }
 ]
