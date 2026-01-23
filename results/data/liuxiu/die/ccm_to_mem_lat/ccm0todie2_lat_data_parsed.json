@@ -1,0 +1,42 @@
+[
+  {
+    "Category": "DIE0",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE1",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE2",
+    "latency(cycles)": "8212 M",
+    "latency(ns)": "54 M"
+  },
+  {
+    "Category": "DIE3",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE4",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE5",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE6",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  },
+  {
+    "Category": "DIE7",
+    "latency(cycles)": "0",
+    "latency(ns)": "0"
+  }
+]

@@ -1,0 +1,14 @@
+ CORE-MEM:data translated from core(local and remote) through cache to memory
+    CORE-MEM->          CS0_RD            CS1_RD            CS2_RD            CS3_RD            CS0_WR            CS1_WR            CS2_WR            CS3_WR           TOTAL_BW
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+       DIE0              332 K             338 K             332 K             329 K             19 K              19 K              17 K              17 K             90 MB/s
+       DIE1              348 K             342 K             350 K             348 K             41 K              35 K              40 K              36 K             98 MB/s
+       DIE2              58 M              58 M              58 M              58 M              16 M              16 M              16 M              16 M             19 GB/s
+       DIE3              269 K             270 K             270 K             272 K             17 K              21 K              16 K              18 K             74 MB/s
+       DIE4              149 K             151 K             152 K             149 K             8610              9800              11 K              9262             41 MB/s
+       DIE5              177 K             176 K             177 K             176 K             10 K              9955              9843              9837             47 MB/s
+       DIE6              162 K             164 K             162 K             163 K             11 K              11 K              11 K              10 K             44 MB/s
+       DIE7              121 K             121 K             123 K             123 K             10 K              11 K              11 K              10 K             34 MB/s
+       SKT0              59 M              59 M              59 M              59 M              16 M              16 M              16 M              16 M             19 GB/s
+       SKT1              610 K             615 K             616 K             612 K             40 K              41 K              43 K              40 K            167 MB/s
+        SYS              60 M              60 M              60 M              60 M              16 M              16 M              16 M              16 M             19 GB/s

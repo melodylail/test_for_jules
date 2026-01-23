@@ -1,0 +1,12 @@
+Latency of accessing Node 2 memory by each Node CPUs
+   Read Latency->        total-        total-requests    avg-cacheable-
+                    latency(cycles)                       latency(ns)
+------------------------------------------------------------------------
+       DIE0              41 M              128 K              273
+       DIE1              492 K             1469               279
+       DIE2                0                 0                 0
+       DIE3              440 K             1355               270
+       DIE4              589 K             1007               487
+       DIE5              683 K             1173               485
+       DIE6              617 K              946               543
+       DIE7              453 K              659               573

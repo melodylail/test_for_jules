@@ -1,0 +1,14 @@
+[
+  {
+    "Category": "Socket0",
+    "IO DIE0": "0  B/s",
+    "IO DIE1": "0  B/s",
+    "IO DIE2": "141 MB/s"
+  },
+  {
+    "Category": "Socket1",
+    "IO DIE0": "0  B/s",
+    "IO DIE1": "0  B/s",
+    "IO DIE2": "19 MB/s"
+  }
+]
