@@ -90,16 +90,29 @@ def load_json_file(filepath):
 
 
 def extract_ccx_df_data_stream(data):
-    """Extract data from CCX df_data_stream format (structured dict)."""
+    """Extract data from CCX df_data_stream format (structured dict).
+    Handles both flat and nested (section-based) structures.
+    """
     if not data or not isinstance(data, list) or len(data) == 0:
         return {}
 
     result = {}
     for item in data:
         if isinstance(item, dict):
-            for metric_name, values in item.items():
+            for key, values in item.items():
                 if isinstance(values, dict):
-                    result[metric_name] = {k: parse_value(v) for k, v in values.items()}
+                    # Check if this is a nested structure (section -> metrics -> values)
+                    # by checking if any value is itself a dict with DIE_CCM keys
+                    first_val = next(iter(values.values()), None)
+                    if isinstance(first_val, dict) and any(k.startswith('DIE') or k.startswith('SKT') for k in first_val.keys()):
+                        # Nested structure: section -> metric -> DIE_CCM values
+                        for metric_name, metric_values in values.items():
+                            if isinstance(metric_values, dict):
+                                flat_key = f"{key}_{metric_name}"
+                                result[flat_key] = {k: parse_value(v) for k, v in metric_values.items()}
+                    else:
+                        # Flat structure: metric -> DIE_CCM values
+                        result[key] = {k: parse_value(v) for k, v in values.items()}
     return result
 
 
@@ -110,7 +123,9 @@ def extract_die_df_data_stream(data):
 
 
 def extract_ccx_df_queue(data):
-    """Extract data from CCX df_queue format."""
+    """Extract data from CCX df_queue format.
+    Handles nested structure: Queue -> Metric -> DIE_CCM values
+    """
     if not data or not isinstance(data, list) or len(data) == 0:
         return {}
 
@@ -121,8 +136,10 @@ def extract_ccx_df_queue(data):
                 if isinstance(queue_data, dict):
                     for metric_name, values in queue_data.items():
                         if isinstance(values, dict) and values:
-                            key = f"{queue_name}_{metric_name}"
-                            result[key] = {k: parse_value(v) for k, v in values.items()}
+                            # Check if values contain DIE_CCM or SKT keys
+                            if any(k.startswith('DIE') or k.startswith('SKT') for k in values.keys()):
+                                key = f"{queue_name}_{metric_name}"
+                                result[key] = {k: parse_value(v) for k, v in values.items()}
     return result
 
 
@@ -173,8 +190,10 @@ def compare_hierarchical_data(ccx_data, die_data, title, output_dir, filename):
         if len(common_components) < 2:
             continue
 
-        # Limit components for visualization
-        components = common_components[:16]
+        # Prioritize components with non-zero values, then fill with zeros alphabetically
+        nonzero_components = sorted([c for c in common_components if ccx_vals.get(c, 0) != 0 or die_vals.get(c, 0) != 0])
+        zero_components = sorted([c for c in common_components if c not in nonzero_components])
+        components = (nonzero_components + zero_components)[:16]
 
         ccx_values = [ccx_vals.get(c, 0) for c in components]
         die_values = [die_vals.get(c, 0) for c in components]

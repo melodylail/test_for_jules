@@ -35,7 +35,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "2793"
       },
-      "RdBlkL": {
+      "|RdBlkL": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "219 K",
         "DIE0_CCM2": "0",
@@ -69,7 +69,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "2787"
       },
-      "RdBlkS": {
+      "|RdBlkS": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -103,7 +103,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "RdBlkX": {
+      "|RdBlkX": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "65",
         "DIE0_CCM2": "0",
@@ -137,7 +137,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "3"
       },
-      "RdBlkC": {
+      "|RdBlkC": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "49",
         "DIE0_CCM2": "0",
@@ -239,7 +239,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "RdSzNC": {
+      "|RdSzNC": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -307,7 +307,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "WrSzFullNC": {
+      "|WrSzFullNC": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -341,7 +341,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "WrSzFullZero": {
+      "|WrSzFullZero": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -409,7 +409,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "OrdWrSzFullNC": {
+      "|OrdWrSzFullNC": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -443,7 +443,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "OrdWrSzFullZero": {
+      "|OrdWrSzFullZero": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -717,7 +717,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "WrSizedFull": {
+      "|WrSizedFull": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -751,7 +751,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "WrSizedNP": {
+      "|WrSizedNP": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",
@@ -785,7 +785,7 @@
         "DIE7_CCM2": "0",
         "DIE7_CCM3": "0"
       },
-      "WrSizedFullNP": {
+      "|WrSizedFullNP": {
         "DIE0_CCM0": "0",
         "DIE0_CCM1": "0",
         "DIE0_CCM2": "0",

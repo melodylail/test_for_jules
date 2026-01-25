@@ -9,8 +9,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "2185",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "2185  B/s",
+    "TOTAL_BW_MAX": "4371  B/s"
   },
   {
     "Category": "DIE1",
@@ -22,8 +22,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "31",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "31  B/s",
+    "TOTAL_BW_MAX": "63  B/s"
   },
   {
     "Category": "DIE2",
@@ -35,8 +35,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "2116",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "2116  B/s",
+    "TOTAL_BW_MAX": "4233  B/s"
   },
   {
     "Category": "DIE3",
@@ -48,8 +48,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "1256",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "1256  B/s",
+    "TOTAL_BW_MAX": "2513  B/s"
   },
   {
     "Category": "DIE4",
@@ -61,8 +61,8 @@
     "CS1_WRSZ": "6",
     "CS2_WRSZ": "10",
     "CS3_WRSZ": "7",
-    "TOTAL_BW_MIN": "4494",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "4494  B/s",
+    "TOTAL_BW_MAX": "8988  B/s"
   },
   {
     "Category": "DIE5",
@@ -74,8 +74,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "4051",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "4051  B/s",
+    "TOTAL_BW_MAX": "8103  B/s"
   },
   {
     "Category": "DIE6",
@@ -87,8 +87,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "188",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "188  B/s",
+    "TOTAL_BW_MAX": "376  B/s"
   },
   {
     "Category": "DIE7",
@@ -100,8 +100,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "552",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "552  B/s",
+    "TOTAL_BW_MAX": "1105  B/s"
   },
   {
     "Category": "SKT0",
@@ -113,8 +113,8 @@
     "CS1_WRSZ": "0",
     "CS2_WRSZ": "0",
     "CS3_WRSZ": "0",
-    "TOTAL_BW_MIN": "5591",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "5591  B/s",
+    "TOTAL_BW_MAX": "11 KB/s"
   },
   {
     "Category": "SKT1",
@@ -126,8 +126,8 @@
     "CS1_WRSZ": "6",
     "CS2_WRSZ": "10",
     "CS3_WRSZ": "7",
-    "TOTAL_BW_MIN": "9286",
-    "TOTAL_BW_MAX": "B/s"
+    "TOTAL_BW_MIN": "9286  B/s",
+    "TOTAL_BW_MAX": "18 KB/s"
   },
   {
     "Category": "SYS",

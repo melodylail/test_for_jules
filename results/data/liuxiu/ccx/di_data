@@ -1,7 +1,0 @@
-Note: data transport between nodes are not supported on 748x platform and only data translation between sockets will be captured!
- DIEIN  :data translated between nodes, the line listed is the In Node
- SocketIn: data translated between sockets(pass IO Die), the line listed is the In socket
-    Socket In->         IO DIE0           IO DIE1           IO DIE2
-------------------------------------------------------------------------
-      Socket0           0  B/s            0  B/s           141 MB/s
-      Socket1           0  B/s            0  B/s            19 MB/s

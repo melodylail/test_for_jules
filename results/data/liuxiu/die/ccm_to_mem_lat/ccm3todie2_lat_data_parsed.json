@@ -1,42 +1,50 @@
 [
   {
-    "Category": "DIE0",
-    "latency(cycles)": "576 K",
-    "latency(ns)": "1938"
+    "DIE": "DIE0",
+    "total-latency-cycles": "576 K",
+    "total-requests": "1938",
+    "avg-cacheable-latency-ns": "247"
   },
   {
-    "Category": "DIE1",
-    "latency(cycles)": "23 K",
-    "latency(ns)": "77"
+    "DIE": "DIE1",
+    "total-latency-cycles": "23 K",
+    "total-requests": "77",
+    "avg-cacheable-latency-ns": "253"
   },
   {
-    "Category": "DIE2",
-    "latency(cycles)": "0",
-    "latency(ns)": "0"
+    "DIE": "DIE2",
+    "total-latency-cycles": "0",
+    "total-requests": "0",
+    "avg-cacheable-latency-ns": "0"
   },
   {
-    "Category": "DIE3",
-    "latency(cycles)": "52 K",
-    "latency(ns)": "201"
+    "DIE": "DIE3",
+    "total-latency-cycles": "52 K",
+    "total-requests": "201",
+    "avg-cacheable-latency-ns": "217"
   },
   {
-    "Category": "DIE4",
-    "latency(cycles)": "35 K",
-    "latency(ns)": "60"
+    "DIE": "DIE4",
+    "total-latency-cycles": "35 K",
+    "total-requests": "60",
+    "avg-cacheable-latency-ns": "494"
   },
   {
-    "Category": "DIE5",
-    "latency(cycles)": "54 K",
-    "latency(ns)": "99"
+    "DIE": "DIE5",
+    "total-latency-cycles": "54 K",
+    "total-requests": "99",
+    "avg-cacheable-latency-ns": "459"
   },
   {
-    "Category": "DIE6",
-    "latency(cycles)": "2546",
-    "latency(ns)": "5"
+    "DIE": "DIE6",
+    "total-latency-cycles": "2546",
+    "total-requests": "5",
+    "avg-cacheable-latency-ns": "424"
   },
   {
-    "Category": "DIE7",
-    "latency(cycles)": "262 K",
-    "latency(ns)": "379"
+    "DIE": "DIE7",
+    "total-latency-cycles": "262 K",
+    "total-requests": "379",
+    "avg-cacheable-latency-ns": "578"
   }
 ]
