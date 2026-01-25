@@ -20,14 +20,15 @@ def parse_df_detail_lat(filepath):
 
     current_target_section = None
     current_transaction_type = None
+    expect_level_line = False  # Flag to capture Level/DIE info from next line
 
-    for line in lines:
+    for i, line in enumerate(lines):
         line_stripped = line.strip()
         if not line_stripped:
             continue
 
-        # Check for TARGET_CORE_DIE section header
-        if line_stripped.startswith("TARGET_CORE_DIE:"):
+        # Check for TARGET_CORE_DIE or SOURCE_CORE_DIE section header
+        if line_stripped.startswith("TARGET_CORE_DIE:") or line_stripped.startswith("SOURCE_CORE_DIE:"):
             parts = re.split(r'\s{2,}', line_stripped)
             current_target_section = {
                 "target_info": parts[0],
@@ -36,10 +37,28 @@ def parse_df_detail_lat(filepath):
                 "transaction_types": []
             }
             parsed_data["target_sections"].append(current_target_section)
+            # If header is alone on line, expect Level/DIE info on next line
+            if len(parts) == 1:
+                expect_level_line = True
             continue
 
-        # Check for transaction type (RDBLK, RDSIZED, etc.)
-        if line_stripped in ["RDBLK", "RDSIZED", "RDSIZEDNC", "WRSIZED", "WRSIZEDNC", "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]:
+        # Capture Level/DIE header from next line after standalone section header
+        if expect_level_line and current_target_section and line_stripped.startswith("Level"):
+            parts = re.split(r'\s{2,}', line_stripped)
+            # Find Level entries and DIE entries
+            level_parts = [p for p in parts if p.startswith("Level")]
+            die_parts = [p for p in parts if p.startswith("DIE")]
+            current_target_section["level_info"] = level_parts
+            current_target_section["die_labels"] = die_parts
+            expect_level_line = False
+            continue
+
+        expect_level_line = False  # Reset flag if we didn't match
+
+        # Check for transaction type (RDBLK, RDSIZED, etc.) - handle both uppercase and mixed case
+        transaction_types_upper = ["RDBLK", "RDSIZED", "RDSIZEDNC", "WRSIZED", "WRSIZEDNC", "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
+        transaction_types_mixed = ["RdBlk", "RdSizedNC", "WrSized", "WrSizedNC", "Atomic"]
+        if line_stripped in transaction_types_upper or line_stripped in transaction_types_mixed:
             current_transaction_type = {
                 "type": line_stripped,
                 "data": []
