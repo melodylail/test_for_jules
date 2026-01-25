@@ -2,6 +2,11 @@
 """
 Parser for df_queue files (e.g., ccm_queue_data, iom_queue_data, cs_queue_data)
 These files contain hierarchical queue data with Level 1/2/3 structure.
+
+Structure:
+- Queue types (Level 1): REQQ, ORIGDQ, PRBQ, RSPQ
+- Level 2 metrics: OCCUPANCY, Request, Bypass Rate, Pick Rate, Kill Rate, etc.
+- Level 3 metrics: 0%-25%, 25%-50%, Command Token Unavail, etc.
 """
 
 import argparse
@@ -10,7 +15,7 @@ import re
 
 
 def parse_df_queue(filepath):
-    """Parse df_queue data file with hierarchical structure."""
+    """Parse df_queue data file with proper Level 1/2/3 hierarchy."""
     with open(filepath, 'r') as f:
         lines = f.readlines()
 
@@ -18,54 +23,113 @@ def parse_df_queue(filepath):
         "sections": []
     }
 
-    current_die_group = None
     current_section = None
+    current_level1 = None  # Queue type (REQQ, etc.)
+    current_level2 = None  # Metric (OCCUPANCY, Request, etc.)
 
     for line in lines:
         line_stripped = line.strip()
         if not line_stripped:
             continue
 
-        # Check if this is a header line with DIE information
-        if line_stripped.startswith("Level 1"):
+        # Check if this is a header line with Level information
+        if "Level 1" in line_stripped:
             parts = re.split(r'\s{2,}', line_stripped)
-            if len(parts) > 2:
-                # Extract DIE labels
-                die_labels = parts[2:]
-                current_die_group = {
-                    "header": parts[:2],
-                    "die_labels": die_labels,
-                    "entries": []
-                }
-                parsed_data["sections"].append(current_die_group)
+            level_parts = [p for p in parts if p.startswith("Level")]
+            die_parts = [p for p in parts if p.startswith("DIE") or p.startswith("SKT")]
+
+            current_section = {
+                "level_headers": level_parts,
+                "die_labels": die_parts,
+                "ccm_labels": [],
+                "queue_types": []
+            }
+            parsed_data["sections"].append(current_section)
+            current_level1 = None
+            current_level2 = None
             continue
 
-        # Parse data rows
+        # Check if this is the CCM/CS/IOM label row
+        if current_section and re.match(r'^(CCM|CS|IOM)\d', line_stripped):
+            parts = re.split(r'\s{2,}', line_stripped)
+            current_section["ccm_labels"] = parts
+            continue
+
+        # Parse the hierarchical structure
         parts = re.split(r'\s{2,}', line_stripped)
 
-        if current_die_group is not None:
-            entry = {
-                "raw_line": line_stripped,
-                "fields": parts
-            }
-            current_die_group["entries"].append(entry)
-        else:
-            # Create a standalone entry
-            entry = {
-                "raw_line": line_stripped,
-                "fields": parts
-            }
-            if "sections" not in parsed_data or len(parsed_data["sections"]) == 0:
-                parsed_data["sections"].append({"entries": []})
-            if "entries" in parsed_data["sections"][-1]:
-                parsed_data["sections"][-1]["entries"].append(entry)
+        if not parts:
+            continue
+
+        first_part = parts[0]
+
+        # Skip empty pipe lines
+        if first_part == '|' and len(parts) == 1:
+            continue
+
+        # Check for Level 3 (sub-metric under Level 2)
+        # Pattern: "|  |-  MetricName  values..." or "|  |_  MetricName  values..."
+        if first_part == '|' and len(parts) > 1 and parts[1] in ['|-', '|_']:
+            metric_name = parts[2] if len(parts) > 2 else None
+            values = extract_values(parts[3:]) if len(parts) > 3 else []
+
+            if metric_name and current_level2:
+                current_level2["level3_metrics"].append({
+                    "name": metric_name,
+                    "values": values,
+                    "raw_line": line_stripped
+                })
+            continue
+
+        # Check for Level 2 (metric with |- or |_ prefix)
+        # Pattern: "|-  MetricName  values..." or "|_  MetricName  values..."
+        if first_part in ['|-', '|_']:
+            metric_name = parts[1] if len(parts) > 1 else None
+            values = extract_values(parts[2:]) if len(parts) > 2 else []
+
+            if metric_name and current_level1:
+                current_level2 = {
+                    "name": metric_name,
+                    "values": values,
+                    "level3_metrics": [],
+                    "raw_line": line_stripped
+                }
+                current_level1["level2_metrics"].append(current_level2)
+            continue
+
+        # Check for Level 1 (queue type like REQQ, ORIGDQ, PRBQ, RSPQ)
+        # These are standalone words at the start of a line without |- prefix
+        if not first_part.startswith('|') and current_section:
+            values = extract_values(parts[1:]) if len(parts) > 1 else []
+
+            # Queue types typically have no values on the same line
+            if len(values) == 0:
+                current_level1 = {
+                    "name": first_part,
+                    "level2_metrics": [],
+                    "raw_line": line_stripped
+                }
+                current_section["queue_types"].append(current_level1)
+                current_level2 = None
+            continue
 
     return parsed_data
 
 
+def extract_values(parts):
+    """Extract numeric values from parts."""
+    values = []
+    for p in parts:
+        p_clean = p.strip()
+        # Match numeric values with optional K/M/G suffix or percentage
+        if p_clean and re.match(r'^[\d.]+\s*[KMG]?%?$', p_clean):
+            values.append(p_clean)
+    return values
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description='Parse df_queue data files.'
+        description='Parse df_queue data files with Level 1/2/3 hierarchy.'
     )
     parser.add_argument('filepath', help='Path to the data file to parse')
     parser.add_argument('--output', '-o', help='Output JSON file path')
