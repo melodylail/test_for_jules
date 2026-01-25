@@ -201,15 +201,19 @@ def compare_df_data_stream():
     files_and_metrics = {
         "ccm_in_data": {
             "title": "CCM_IN_DATA (CCM Input Data Transfer)",
-            "metrics": ["Data Transfer", "PrbTgt"]
+            "metrics": ["Data Transfer", "No Data Transfer", "State/PassD", "PrbSrc", "PrbTgt"]
+        },
+        "ccm_out_todie2_data": {
+            "title": "CCM_OUT_TODIE2_DATA (CCM Output to DIE2)",
+            "metrics": ["RdBlkAny", "RdBlkL", "SpecDramRd", "VICBLKCLN", "VICBLKFULL", "CHGTOX"]
         },
         "cs_in_data": {
             "title": "CS_IN_DATA (Requests into CS from CCM)",
-            "metrics": ["VicBlk", "RdBlk", "ChgToX"]
+            "metrics": ["VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "ChgToX"]
         },
         "cs_out_data": {
             "title": "CS_OUT_DATA (Requests from CS to UMC/Memory)",
-            "metrics": ["Requests to UMC", "RdBlkS", "WrSizedNC"]
+            "metrics": ["Requests to UMC", "RdBlkS", "RdSizedNC", "WrSizedNC", "QosControl for FT"]
         },
         "spf_in_data": {
             "title": "SPF_IN_DATA (Requests into SPF)",
