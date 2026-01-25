@@ -22,6 +22,9 @@ rm -f results/*.json
 rm -f error.log
 touch error.log
 
+# Create results directory if it doesn't exist
+mkdir -p results
+
 # Function to run a parser on all files in a directory
 run_parser() {
     local parser_script=$1
