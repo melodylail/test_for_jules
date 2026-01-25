@@ -145,32 +145,94 @@ def compare_iom_data():
 
         print(f"{cat:<8} {vals[0]:>15.0f} {vals[1]:>15.0f} {vals[2]:>18.0f} {ratio:>15}")
 
+def extract_die2_values_from_file(filepath, metrics):
+    """Extract DIE2 values for given metrics from a raw data file."""
+    results = {}
+    try:
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+
+        for line in lines[2:]:  # Skip header lines
+            parts = re.split(r'\s{2,}', line.strip())
+            if not parts:
+                continue
+
+            # Get metric name (first non-empty, non-pipe part)
+            metric_name = None
+            for p in parts:
+                p_clean = p.replace('|-', '').replace('|_', '').replace('|', '').strip()
+                if p_clean and p_clean not in ['', '-']:
+                    metric_name = p_clean
+                    break
+
+            if metric_name in metrics:
+                # Extract numeric values
+                values = []
+                for p in parts[1:]:
+                    p_clean = p.replace('|-', '').replace('|_', '').replace('|', '').strip()
+                    if p_clean and re.match(r'^[\d.]+\s*[KMG]?$', p_clean):
+                        values.append(parse_value(p_clean))
+
+                # DIE2 is typically the 3rd DIE (index 2), each DIE has 4 CS values
+                if len(values) >= 12:
+                    die2_sum = sum(values[8:12])
+                    results[metric_name] = die2_sum
+    except:
+        pass
+    return results
+
+def fmt(v):
+    """Format large numbers with K/M/G suffixes."""
+    if v >= 1e9:
+        return f"{v/1e9:.1f}G"
+    elif v >= 1e6:
+        return f"{v/1e6:.1f}M"
+    elif v >= 1e3:
+        return f"{v/1e3:.0f}K"
+    else:
+        return str(int(v))
+
 def compare_df_data_stream():
-    """Compare data flow stream metrics."""
+    """Compare all data flow stream metrics."""
     print("\n" + "="*90)
-    print("DF_DATA_STREAM: CCM In Data Transfer Comparison")
+    print("DF_DATA_STREAM: Complete Comparison (DIE2 Totals)")
     print("="*90)
 
-    data = {ds: run_parser("liuxiu_df_data_stream_parser.py", f"{DATA_DIR}/{ds}/df_data_stream/ccm_in_data")
-            for ds in DATASETS}
+    files_and_metrics = {
+        "ccm_in_data": {
+            "title": "CCM_IN_DATA (CCM Input Data Transfer)",
+            "metrics": ["Data Transfer", "PrbTgt"]
+        },
+        "cs_in_data": {
+            "title": "CS_IN_DATA (Requests into CS from CCM)",
+            "metrics": ["VicBlk", "RdBlk", "ChgToX"]
+        },
+        "cs_out_data": {
+            "title": "CS_OUT_DATA (Requests from CS to UMC/Memory)",
+            "metrics": ["Requests to UMC", "RdBlkS", "WrSizedNC"]
+        },
+        "spf_in_data": {
+            "title": "SPF_IN_DATA (Requests into SPF)",
+            "metrics": ["RdSized", "RdBlkL", "VicBlkFull", "ChgToX"]
+        },
+        "spf_out_data": {
+            "title": "SPF_OUT_DATA (Responses from SPF)",
+            "metrics": ["Target", "Miss", "Hit"]
+        }
+    }
 
-    print(f"\n{'Metric':<20} {'CCX':>20} {'DIE':>20} {'SOCKET':>20}")
-    print("-"*82)
+    for fname, config in files_and_metrics.items():
+        print(f"\n--- {config['title']} ---")
+        print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
+        print("-" * 80)
 
-    for ds, parsed in data.items():
-        if parsed and parsed.get("sections"):
-            for entry in parsed["sections"][0].get("entries", []):
-                raw = entry.get("raw_line", "")
-                fields = entry.get("fields", [])
-                if "Data Transfer" in raw and len(fields) > 5:
-                    die0_ccm0 = fields[1] if len(fields) > 1 else "N/A"
-                    die0_total = sum(parse_value(fields[i]) for i in range(1, 5) if i < len(fields))
-                    if ds == "ccx":
-                        print(f"{'DIE0 Data Transfer':<20} {die0_total:>20.0f}", end="")
-                    elif ds == "die":
-                        print(f" {die0_total:>20.0f}", end="")
-                    else:
-                        print(f" {die0_total:>20.0f}")
+        for metric in config["metrics"]:
+            vals = []
+            for ds in DATASETS:
+                filepath = f"{DATA_DIR}/{ds}/df_data_stream/{fname}"
+                result = extract_die2_values_from_file(filepath, [metric])
+                vals.append(result.get(metric, 0))
+            print(f"{metric:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
 
 def compare_df_detail_lat():
     """Compare detailed latency histograms."""
