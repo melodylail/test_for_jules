@@ -146,7 +146,10 @@ def compare_iom_data():
         print(f"{cat:<8} {vals[0]:>15.0f} {vals[1]:>15.0f} {vals[2]:>18.0f} {ratio:>15}")
 
 def extract_die2_values_from_file(filepath, metrics):
-    """Extract DIE2 values for given metrics from a raw data file."""
+    """Extract DIE2 values for given metrics from a raw data file.
+
+    Note: Takes the first occurrence of each metric (typically from Request section).
+    """
     results = {}
     try:
         with open(filepath, 'r') as f:
@@ -165,10 +168,11 @@ def extract_die2_values_from_file(filepath, metrics):
                     metric_name = p_clean
                     break
 
-            if metric_name in metrics:
-                # Extract numeric values
+            # Only take the first occurrence of each metric
+            if metric_name in metrics and metric_name not in results:
+                # Extract ALL numeric values from the line (not just from parts[1:])
                 values = []
-                for p in parts[1:]:
+                for p in parts:
                     p_clean = p.replace('|-', '').replace('|_', '').replace('|', '').strip()
                     if p_clean and re.match(r'^[\d.]+\s*[KMG]?$', p_clean):
                         values.append(parse_value(p_clean))
@@ -209,7 +213,7 @@ def compare_df_data_stream():
         },
         "cs_in_data": {
             "title": "CS_IN_DATA (Requests into CS from CCM)",
-            "metrics": ["VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "ChgToX"]
+            "metrics": ["VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "RdBlkX", "RdBlkC", "ChgToX", "SrcDn"]
         },
         "cs_out_data": {
             "title": "CS_OUT_DATA (Requests from CS to UMC/Memory)",
