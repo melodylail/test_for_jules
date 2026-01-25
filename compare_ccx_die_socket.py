@@ -235,41 +235,238 @@ def compare_df_data_stream():
             print(f"{metric:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
 
 def compare_df_detail_lat():
-    """Compare detailed latency histograms."""
+    """Compare detailed latency data."""
     print("\n" + "="*90)
-    print("DF_DETAIL_LAT: RDBLK Latency Distribution (CCM2 to DIE2)")
+    print("DF_DETAIL_LAT: Detailed Latency Comparison")
     print("="*90)
 
-    data = {ds: run_parser("liuxiu_df_detail_lat_parser.py",
-                           f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data")
-            for ds in DATASETS}
+    # Extract transaction counts and latency from raw files
+    all_data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
+        try:
+            with open(filepath, 'r') as f:
+                lines = f.readlines()
+        except:
+            continue
 
-    # Extract latency histogram for RDBLK SDP
-    print(f"\n{'Latency Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-"*62)
+        data = {}
+        for i, line in enumerate(lines):
+            # Extract RDBLK SDP transaction values (line ~5)
+            if 'SDP' in line and 'Transaction' not in line and 'Histogram' not in line and i < 10:
+                parts = re.split(r'\s{2,}', line.strip())
+                vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                if vals and len(vals) >= 16:
+                    data["RDBLK_SDP_DIE0"] = sum(vals[:4])
+                    data["RDBLK_SDP_DIE1"] = sum(vals[4:8])
+                    data["RDBLK_SDP_DIE2"] = sum(vals[8:12])
+                    data["RDBLK_SDP_DIE3"] = sum(vals[12:16])
+                    data["RDBLK_SDP_Total"] = sum(vals)
+                break
 
-    histograms = defaultdict(dict)
-    for ds, parsed in data.items():
-        if parsed and parsed.get("target_sections"):
-            for section in parsed["target_sections"]:
-                for tx in section.get("transaction_types", []):
-                    if tx.get("type") in ["RDBLK", "RdBlk"]:
-                        in_histogram = False
-                        for entry in tx.get("data", []):
-                            raw = entry.get("raw_line", "")
-                            fields = entry.get("fields", [])
-                            if "SDP Latency Histogram" in raw:
-                                in_histogram = True
-                            elif in_histogram and "ns" in raw:
-                                bucket = fields[2] if len(fields) > 2 else "N/A"
-                                value = fields[3] if len(fields) > 3 else "0"
-                                histograms[bucket][ds] = value
-                            elif "FTI" in raw:
-                                in_histogram = False
+        # Extract FTI values
+        for i, line in enumerate(lines):
+            if 'FTI' in line and 'Transaction' not in line and 'Histogram' not in line and i < 10:
+                parts = re.split(r'\s{2,}', line.strip())
+                vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                if vals and len(vals) >= 12:
+                    data["RDBLK_FTI_DIE2"] = sum(vals[8:12])
+                    data["RDBLK_FTI_Total"] = sum(vals)
+                break
 
-    for bucket in ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]:
-        vals = [histograms[bucket].get(ds, "0.00%") for ds in DATASETS]
-        print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+        # Extract AVG LAT values
+        for i, line in enumerate(lines):
+            if 'AVG LAT' in line:
+                for j in range(i+1, min(i+3, len(lines))):
+                    if 'SDP' in lines[j]:
+                        parts = re.split(r'\s{2,}', lines[j].strip())
+                        vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+$', p.strip())]
+                        if vals and len(vals) >= 12:
+                            nonzero = [v for v in vals[8:12] if v > 0]
+                            data["RDBLK_AvgLat_DIE2"] = sum(nonzero) / len(nonzero) if nonzero else 0
+                        break
+                break
+
+        # Extract DIRTY_VICTIM SDP values
+        in_dirty_victim = False
+        for i, line in enumerate(lines):
+            if 'DIRTY_VICTIM' in line:
+                in_dirty_victim = True
+                continue
+            if in_dirty_victim and 'SDP' in line and 'Transaction' not in line and 'Histogram' not in line:
+                parts = re.split(r'\s{2,}', line.strip())
+                vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                if vals and len(vals) >= 12:
+                    data["DirtyVictim_SDP_DIE2"] = sum(vals[8:12])
+                    data["DirtyVictim_SDP_Total"] = sum(vals)
+                break
+
+        # Extract latency histogram
+        in_sdp_histogram = False
+        buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
+        for line in lines:
+            if 'SDP Latency Histogram' in line:
+                in_sdp_histogram = True
+                continue
+            if in_sdp_histogram and 'FTI' in line:
+                break
+            if in_sdp_histogram:
+                for bucket in buckets:
+                    if bucket in line:
+                        parts = re.split(r'\s{2,}', line.strip())
+                        pct_vals = [p for p in parts if '%' in p]
+                        if len(pct_vals) >= 9:
+                            data[f"Histogram_{bucket}"] = pct_vals[8]  # DIE2 CCM0
+                        break
+
+        all_data[ds] = data
+
+    # Print RDBLK Transaction comparison
+    print("\n--- RDBLK Transaction Counts ---")
+    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
+    print("-" * 80)
+
+    metrics = [
+        ("RDBLK_SDP_DIE0", "RDBLK SDP DIE0"),
+        ("RDBLK_SDP_DIE1", "RDBLK SDP DIE1"),
+        ("RDBLK_SDP_DIE2", "RDBLK SDP DIE2"),
+        ("RDBLK_SDP_DIE3", "RDBLK SDP DIE3"),
+        ("RDBLK_SDP_Total", "RDBLK SDP Total"),
+        ("RDBLK_FTI_DIE2", "RDBLK FTI DIE2"),
+        ("RDBLK_FTI_Total", "RDBLK FTI Total"),
+    ]
+    for key, label in metrics:
+        vals = [all_data.get(ds, {}).get(key, 0) for ds in DATASETS]
+        print(f"{label:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
+
+    # Print latency
+    print(f"\n{'RDBLK Avg Latency DIE2':<25}", end="")
+    for ds in DATASETS:
+        lat = all_data.get(ds, {}).get("RDBLK_AvgLat_DIE2", 0)
+        print(f"{lat:>18.0f} ns" if lat > 0 else f"{'N/A':>18}", end="")
+    print()
+
+    # Print DIRTY_VICTIM comparison
+    print("\n--- DIRTY_VICTIM Transaction Counts ---")
+    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
+    print("-" * 80)
+    for key, label in [("DirtyVictim_SDP_DIE2", "DIRTY_VICTIM SDP DIE2"), ("DirtyVictim_SDP_Total", "DIRTY_VICTIM SDP Total")]:
+        vals = [all_data.get(ds, {}).get(key, 0) for ds in DATASETS]
+        print(f"{label:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
+
+    # Print latency histogram
+    print("\n--- RDBLK SDP Latency Histogram (DIE2 CCM0) ---")
+    print(f"{'Latency Bucket':<15} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
+    print("-" * 70)
+    buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
+    for bucket in buckets:
+        vals = [all_data.get(ds, {}).get(f"Histogram_{bucket}", "N/A") for ds in DATASETS]
+        print(f"{bucket:<15} {vals[0]:>18} {vals[1]:>18} {vals[2]:>18}")
+
+
+def compare_df_queue():
+    """Compare queue metrics."""
+    print("\n" + "="*90)
+    print("DF_QUEUE: Queue Metrics Comparison")
+    print("="*90)
+
+    all_data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
+        try:
+            with open(filepath, 'r') as f:
+                lines = f.readlines()
+        except:
+            continue
+
+        data = {}
+        current_queue = None
+
+        for line in lines:
+            line_stripped = line.strip()
+
+            # Detect queue type
+            if line_stripped in ["REQQ", "RSPQ", "PRBQ", "ORIGDQ"]:
+                current_queue = line_stripped
+                continue
+
+            parts = re.split(r'\s{2,}', line_stripped)
+
+            if current_queue == "REQQ":
+                if "Request" in line_stripped and "Kill" not in line_stripped:
+                    vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                    data["REQQ_Request_DIE0"] = sum(vals[:4]) if len(vals) >= 4 else 0
+                    data["REQQ_Request_DIE1"] = sum(vals[4:8]) if len(vals) >= 8 else 0
+                elif "Bypass Rate" in line_stripped and "|" not in line_stripped[:5]:
+                    vals = [parse_value(p.replace('%', '')) for p in parts if '%' in p]
+                    data["REQQ_Bypass_DIE0"] = sum(vals[:4])/4 if len(vals) >= 4 else 0
+                elif "Kill Rate" in line_stripped and "|_" in line_stripped:
+                    vals = [parse_value(p.replace('%', '')) for p in parts if '%' in p]
+                    data["REQQ_Kill_DIE0"] = sum(vals[:4])/4 if len(vals) >= 4 else 0
+
+            elif current_queue == "PRBQ":
+                if "Probe" in line_stripped and "Bypass" not in line_stripped:
+                    vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                    data["PRBQ_Probe_DIE0"] = sum(vals[:4]) if len(vals) >= 4 else 0
+                elif "Req Bypass Rate" in line_stripped:
+                    vals = [parse_value(p.replace('%', '')) for p in parts if '%' in p]
+                    data["PRBQ_Bypass_DIE0"] = sum(vals[:4])/4 if len(vals) >= 4 else 0
+
+            elif current_queue == "RSPQ":
+                if "Response" in line_stripped:
+                    vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                    data["RSPQ_Response_DIE0"] = sum(vals[:4]) if len(vals) >= 4 else 0
+                elif "RdRsp Kill Rate" in line_stripped:
+                    vals = [parse_value(p.replace('%', '')) for p in parts if '%' in p]
+                    data["RSPQ_Kill_DIE0"] = sum(vals[:4])/4 if len(vals) >= 4 else 0
+
+            elif current_queue == "ORIGDQ":
+                if "write" in line_stripped and "Pick" not in line_stripped:
+                    vals = [parse_value(p) for p in parts if re.match(r'^[\d.]+\s*[KMG]?$', p.strip())]
+                    data["ORIGDQ_Write_DIE0"] = sum(vals[:4]) if len(vals) >= 4 else 0
+
+        all_data[ds] = data
+
+    # Print CCM Queue comparison
+    print("\n--- CCM Queue Metrics (DIE0) ---")
+    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18} {'Observation':<20}")
+    print("-" * 100)
+
+    metrics = [
+        ("REQQ_Request_DIE0", "REQQ Requests", "count"),
+        ("REQQ_Request_DIE1", "REQQ Requests DIE1", "count"),
+        ("REQQ_Bypass_DIE0", "REQQ Bypass Rate", "pct"),
+        ("REQQ_Kill_DIE0", "REQQ Kill Rate", "pct"),
+        ("PRBQ_Probe_DIE0", "PRBQ Probes", "count"),
+        ("PRBQ_Bypass_DIE0", "PRBQ Bypass Rate", "pct"),
+        ("RSPQ_Response_DIE0", "RSPQ Responses", "count"),
+        ("RSPQ_Kill_DIE0", "RSPQ Kill Rate", "pct"),
+        ("ORIGDQ_Write_DIE0", "ORIGDQ Writes", "count"),
+    ]
+
+    for key, label, mtype in metrics:
+        vals = [all_data.get(ds, {}).get(key, 0) for ds in DATASETS]
+
+        if mtype == "count":
+            strs = [fmt(v) for v in vals]
+        else:
+            strs = [f"{v:.2f}%" for v in vals]
+
+        # Observation
+        obs = ""
+        if vals[0] != 0 and vals[2] != 0:
+            if mtype == "count":
+                ratio = vals[2] / vals[0] if vals[0] > 0 else 0
+                if ratio > 2:
+                    obs = f"SOCKET {ratio:.0f}x higher"
+                elif ratio < 0.5:
+                    obs = f"CCX {1/ratio:.0f}x higher"
+            else:
+                diff = vals[2] - vals[0]
+                if abs(diff) > 2:
+                    obs = f"SOCKET {'+' if diff > 0 else ''}{diff:.1f}%"
+
+        print(f"{label:<25} {strs[0]:>18} {strs[1]:>18} {strs[2]:>18} {obs:<20}")
 
 def print_summary():
     """Print summary of differences."""
