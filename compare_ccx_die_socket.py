@@ -145,14 +145,14 @@ def compare_iom_data():
 
         print(f"{cat:<8} {vals[0]:>15.0f} {vals[1]:>15.0f} {vals[2]:>18.0f} {ratio:>15}")
 
-def extract_metric_values_from_parsed(parsed_data, metric_name, die_index=2, section_index=0):
+def extract_metric_values_from_parsed(parsed_data, metric_name, die_index=2, section_index=None):
     """Extract metric values from parsed JSON data using new Level 1/2/3 structure.
 
     Args:
         parsed_data: Parsed JSON from the parser
         metric_name: Name of the metric to find
         die_index: Which DIE to extract (0-7), default 2 for DIE2
-        section_index: Which section to use (for files with multiple DIE groups)
+        section_index: Which section to use (None = auto-detect based on die_index)
 
     Returns:
         Sum of values for the specified DIE
@@ -164,25 +164,59 @@ def extract_metric_values_from_parsed(parsed_data, metric_name, die_index=2, sec
     if not sections:
         return 0
 
-    # Try to find the metric in Level 1 categories (for Format B like ccm_in_data)
-    for section in sections:
-        for cat in section.get("level1_categories", []):
-            # Check Level 1 name
-            if cat.get("name") == metric_name:
-                values = cat.get("values", [])
-                return sum_die_values(values, die_index)
+    # Determine section and local die index based on file structure
+    # Files with 1 section: DIE0-7 all in section 0 (32 values)
+    # Files with 2 sections: DIE0-3 in section 0, DIE4-7 in section 1 (16 values each)
+    num_sections = len(sections)
+    if num_sections == 1:
+        # Single section with all DIEs
+        target_section_idx = 0
+        local_die_index = die_index
+    else:
+        # Multiple sections - determine which section has this DIE
+        # Check die_labels in sections to find the right one
+        target_section_idx = None
+        local_die_index = die_index
 
-            # Check Level 2 metrics
-            for m2 in cat.get("level2_metrics", []):
-                if m2.get("name") == metric_name:
-                    values = m2.get("values", [])
-                    return sum_die_values(values, die_index)
+        for i, section in enumerate(sections):
+            die_labels = section.get("die_labels", [])
+            die_name = f"DIE{die_index}"
+            if die_name in die_labels:
+                target_section_idx = i
+                # Calculate local index within this section
+                local_die_index = die_labels.index(die_name)
+                break
 
-                # Check Level 3 metrics
-                for m3 in m2.get("level3_metrics", []):
-                    if m3.get("name") == metric_name:
-                        values = m3.get("values", [])
-                        return sum_die_values(values, die_index)
+        if target_section_idx is None:
+            return 0
+
+    # Override if section_index is explicitly provided
+    if section_index is not None:
+        target_section_idx = section_index
+
+    if target_section_idx >= len(sections):
+        return 0
+
+    section = sections[target_section_idx]
+
+    # Try to find the metric in Level 1 categories
+    for cat in section.get("level1_categories", []):
+        # Check Level 1 name
+        if cat.get("name") == metric_name:
+            values = cat.get("values", [])
+            return sum_die_values(values, local_die_index)
+
+        # Check Level 2 metrics
+        for m2 in cat.get("level2_metrics", []):
+            if m2.get("name") == metric_name:
+                values = m2.get("values", [])
+                return sum_die_values(values, local_die_index)
+
+            # Check Level 3 metrics
+            for m3 in m2.get("level3_metrics", []):
+                if m3.get("name") == metric_name:
+                    values = m3.get("values", [])
+                    return sum_die_values(values, local_die_index)
 
     return 0
 
