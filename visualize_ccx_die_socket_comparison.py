@@ -478,91 +478,220 @@ def visualize_df_data_stream():
 
 
 def visualize_df_detail_lat():
-    """Visualize DF_DETAIL_LAT with Level 3 latency histograms."""
+    """Visualize DF_DETAIL_LAT with all Level 1 transaction types and Level 3 latency histograms.
+
+    Structure:
+    - Level 1: TARGET_CORE_DIE:2
+    - Transaction Types: RDBLK, RDSIZED, RDSIZEDNC, WRSIZED, WRSIZEDNC, DIRTY_VICTIM, CLEAN_VICITM, ATOMIC
+    - Level 2: Transaction, AVG LAT(ns), SDP Latency Histogram, FTI Latency Histogram
+    - Level 3: SDP, FTI, latency buckets
+    """
     print("  Creating DF_DETAIL_LAT visualizations...")
 
     output_subdir = os.path.join(OUTPUT_DIR, 'df_detail_lat')
     os.makedirs(output_subdir, exist_ok=True)
 
-    # Parse data
-    parsed = {}
+    # Parse data for CCM and IOM
+    parsed_ccm = {}
+    parsed_iom = {}
     for ds in DATASETS:
-        filepath = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
-        parsed[ds] = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
+        ccm_path = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
+        iom_path = f"{DATA_DIR}/{ds}/df_detail_lat/iom2todie2_latency_data"
+        parsed_ccm[ds] = run_parser("liuxiu_df_detail_lat_parser.py", ccm_path)
+        parsed_iom[ds] = run_parser("liuxiu_df_detail_lat_parser.py", iom_path)
 
-    # 1. Transaction counts comparison (all DIEs)
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('RDBLK Transaction Counts - All DIEs Comparison', fontsize=14, fontweight='bold')
+    # All Level 1 transaction types
+    transaction_types = ["RDBLK", "RDSIZED", "RDSIZEDNC", "WRSIZED", "WRSIZEDNC",
+                         "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
 
     dies = [f"DIE{i}" for i in range(8)]
     x = np.arange(len(dies))
     width = 0.25
+    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns",
+                       "200ns-500ns", "500ns-1000ns", ">1000ns"]
 
-    metrics = [
-        ("RDBLK", "Transaction", "SDP", "RDBLK SDP Transactions"),
-        ("RDBLK", "Transaction", "FTI", "RDBLK FTI Transactions"),
-        ("RDBLK", "AVG LAT(ns)", "SDP", "RDBLK SDP Avg Latency (ns)"),
-        ("DIRTY_VICTIM", "Transaction", "SDP", "DIRTY_VICTIM SDP Transactions"),
-    ]
+    # ========== CCM2TODIE2_LATENCY_DATA ==========
+    # 1. Summary chart: All transaction types SDP counts (DIE2 focus)
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - SDP Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
 
-    for idx, (tx, l2, l3, title) in enumerate(metrics):
-        ax = axes[idx // 2, idx % 2]
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
 
         for i, ds in enumerate(DATASETS):
-            if ds not in parsed or not parsed[ds]:
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
                 continue
 
-            values = [extract_detail_lat_metric(parsed[ds], tx, l2, l3, die_idx) for die_idx in range(8)]
-            ax.bar(x + (i - 1) * width, values, width,
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
                    label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
 
-        ax.set_xlabel('DIE', fontsize=11)
-        ax.set_ylabel('Count' if 'Transaction' in title else 'Latency (ns)', fontsize=11)
-        ax.set_title(title, fontsize=12)
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} SDP', fontsize=10)
         ax.set_xticks(x)
-        ax.set_xticklabels(dies)
-        ax.legend()
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
         ax.grid(axis='y', alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_subdir, 'rdblk_transactions_all_dies.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_sdp.png'), dpi=300, bbox_inches='tight')
     plt.close()
-    print("    Saved: rdblk_transactions_all_dies.png")
+    print("    Saved: ccm_all_tx_types_sdp.png")
 
-    # 2. Level 3: Latency Histogram comparison (DIE2)
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    fig.suptitle('RDBLK Latency Histogram (Level 3) - DIE2 Comparison', fontsize=14, fontweight='bold')
+    # 2. All transaction types FTI counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - FTI Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
 
-    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
-    x = np.arange(len(latency_buckets))
-
-    for ax_idx, (histogram_type, title) in enumerate([("SDP Latency Histogram", "SDP"), ("FTI Latency Histogram", "FTI")]):
-        ax = axes[ax_idx]
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
 
         for i, ds in enumerate(DATASETS):
-            if ds not in parsed or not parsed[ds]:
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
                 continue
 
-            values = []
-            for bucket in latency_buckets:
-                val = extract_detail_lat_metric(parsed[ds], "RDBLK", histogram_type, bucket, die_index=2)
-                values.append(val)
-
-            ax.bar(x + (i - 1) * width, values, width,
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "FTI", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
                    label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
 
-        ax.set_xlabel('Latency Bucket', fontsize=11)
-        ax.set_ylabel('Percentage (%)', fontsize=11)
-        ax.set_title(f'{title} Latency Histogram', fontsize=12)
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} FTI', fontsize=10)
         ax.set_xticks(x)
-        ax.set_xticklabels(latency_buckets, rotation=45, ha='right', fontsize=9)
-        ax.legend()
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
         ax.grid(axis='y', alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_subdir, 'latency_histogram_level3_die2.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_fti.png'), dpi=300, bbox_inches='tight')
     plt.close()
-    print("    Saved: latency_histogram_level3_die2.png")
+    print("    Saved: ccm_all_tx_types_fti.png")
+
+    # 3. All transaction types AVG LAT
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - AVG LAT(ns) SDP (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "AVG LAT(ns)", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, values, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Latency (ns)', fontsize=9)
+        ax.set_title(f'{tx_type} AVG LAT', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_avg_lat.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: ccm_all_tx_types_avg_lat.png")
+
+    # 4. Latency histograms for key transaction types (DIE2)
+    key_tx_types = ["RDBLK", "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
+    x_hist = np.arange(len(latency_buckets))
+
+    for tx_type in key_tx_types:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+        fig.suptitle(f'CCM2TODIE2: {tx_type} Latency Histogram (Level 3) - DIE2', fontsize=14, fontweight='bold')
+
+        for ax_idx, (histogram_type, title) in enumerate([("SDP Latency Histogram", "SDP"), ("FTI Latency Histogram", "FTI")]):
+            ax = axes[ax_idx]
+
+            for i, ds in enumerate(DATASETS):
+                if ds not in parsed_ccm or not parsed_ccm[ds]:
+                    continue
+
+                values = []
+                for bucket in latency_buckets:
+                    val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, histogram_type, bucket, die_index=2)
+                    values.append(val if isinstance(val, (int, float)) else 0)
+
+                ax.bar(x_hist + (i - 1) * width, values, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+            ax.set_xlabel('Latency Bucket', fontsize=11)
+            ax.set_ylabel('Percentage (%)', fontsize=11)
+            ax.set_title(f'{title} Latency Histogram', fontsize=12)
+            ax.set_xticks(x_hist)
+            ax.set_xticklabels(latency_buckets, rotation=45, ha='right', fontsize=9)
+            ax.legend()
+            ax.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_subdir, f'ccm_{tx_type.lower()}_histogram_die2.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    Saved: ccm_{tx_type.lower()}_histogram_die2.png")
+
+    # ========== IOM2TODIE2_LATENCY_DATA ==========
+    # 5. IOM Summary chart: All transaction types SDP counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('IOM2TODIE2: All Transaction Types - SDP Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_iom or not parsed_iom[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} SDP', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_all_tx_types_sdp.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: iom_all_tx_types_sdp.png")
+
+    # 6. IOM All transaction types FTI counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('IOM2TODIE2: All Transaction Types - FTI Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_iom or not parsed_iom[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "FTI", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} FTI', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_all_tx_types_fti.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: iom_all_tx_types_fti.png")
 
 
 def visualize_df_queue():
