@@ -301,7 +301,12 @@ def visualize_df_data_stream():
     # Parse data for each dataset
     files_metrics = {
         "ccm_in_data": ["Data Transfer", "No Data Transfer", "State/PassD", "Inv_NoPassD", "Inv_PassD", "Shr_NoPassD", "Shr_PassD", "PrbSrc", "PrbTgt"],
-        "cs_in_data": ["ChgToX", "VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "RdBlkX", "RdBlkC"],
+        "cs_in_data": [
+            # Request (Level 1)
+            "ChgToX", "VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "RdBlkX", "RdBlkC",
+            # Response (Level 1)
+            "SrcDn", "Probe Response", "Single", "Multiple", "With Data", "MemFetch"
+        ],
     }
 
     for fname, metrics in files_metrics.items():

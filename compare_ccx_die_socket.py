@@ -288,6 +288,7 @@ def compare_df_data_stream():
         "cs_in_data": {
             "title": "CS_IN_DATA (Requests into CS from CCM)",
             "metrics": [
+                # Request (Level 1)
                 ("ChgToX", 2),             # Level 2 under Request
                 ("VicBlk", 2),             # Level 2
                 ("VicBlkFull", 3),         # Level 3 under VicBlk
@@ -296,7 +297,13 @@ def compare_df_data_stream():
                 ("RdBlkL", 3),             # Level 3 under RdBlk
                 ("RdBlkX", 3),             # Level 3 under RdBlk
                 ("RdBlkC", 3),             # Level 3 under RdBlk
+                # Response (Level 1)
                 ("SrcDn", 2),              # Level 2 under Response
+                ("Probe Response", 2),     # Level 2 under Response
+                ("Single", 3),             # Level 3 under Probe Response
+                ("Multiple", 3),           # Level 3 under Probe Response
+                ("With Data", 3),          # Level 3 under Probe Response
+                ("MemFetch", 2),           # Level 2 under Response
             ]
         },
         "cs_out_data": {
