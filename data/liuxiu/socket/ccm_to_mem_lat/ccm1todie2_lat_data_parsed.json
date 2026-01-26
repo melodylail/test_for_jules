@@ -1,0 +1,50 @@
+[
+  {
+    "DIE": "DIE0",
+    "total-latency-cycles": "557 M",
+    "total-requests": "1767 K",
+    "avg-cacheable-latency-ns": "262"
+  },
+  {
+    "DIE": "DIE1",
+    "total-latency-cycles": "1471 M",
+    "total-requests": "5721 K",
+    "avg-cacheable-latency-ns": "214"
+  },
+  {
+    "DIE": "DIE2",
+    "total-latency-cycles": "0",
+    "total-requests": "0",
+    "avg-cacheable-latency-ns": "0"
+  },
+  {
+    "DIE": "DIE3",
+    "total-latency-cycles": "407 M",
+    "total-requests": "1415 K",
+    "avg-cacheable-latency-ns": "239"
+  },
+  {
+    "DIE": "DIE4",
+    "total-latency-cycles": "11 K",
+    "total-requests": "21",
+    "avg-cacheable-latency-ns": "452"
+  },
+  {
+    "DIE": "DIE5",
+    "total-latency-cycles": "15 K",
+    "total-requests": "33",
+    "avg-cacheable-latency-ns": "397"
+  },
+  {
+    "DIE": "DIE6",
+    "total-latency-cycles": "0",
+    "total-requests": "0",
+    "avg-cacheable-latency-ns": "0"
+  },
+  {
+    "DIE": "DIE7",
+    "total-latency-cycles": "652",
+    "total-requests": "1",
+    "avg-cacheable-latency-ns": "543"
+  }
+]

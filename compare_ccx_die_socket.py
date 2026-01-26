@@ -14,6 +14,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data/liuxiu")
 DATASETS = ["ccx", "die", "socket"]
 
+# Flag to control whether to dump parsed JSON files
+DUMP_PARSED_JSON = True
+
+
+def save_parsed_json(parsed_data, output_path):
+    """Save parsed data to a JSON file."""
+    if not DUMP_PARSED_JSON or parsed_data is None:
+        return
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w') as f:
+        json.dump(parsed_data, f, indent=2)
+    print(f"  [Saved] {output_path}")
+
+
 def parse_value(val_str):
     """Convert string value like '37 M', '15 K', '90 MB/s' to numeric."""
     if not val_str or val_str == "0" or val_str == "N/A":
@@ -52,7 +66,12 @@ def compare_cm_data():
     print("CM_DATA: Core-to-Memory Bandwidth Comparison")
     print("="*90)
 
-    data = {ds: run_parser("cm_data_parser.py", f"{DATA_DIR}/{ds}/cm_data") for ds in DATASETS}
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/cm_data"
+        parsed = run_parser("cm_data_parser.py", filepath)
+        data[ds] = parsed
+        save_parsed_json(parsed, f"{DATA_DIR}/{ds}/cm_data_parsed.json")
 
     # Build comparison table
     results = defaultdict(dict)
@@ -94,7 +113,12 @@ def compare_latency():
     print("-"*92)
 
     for fname in ["ccm0todie2_lat_data", "ccm1todie2_lat_data", "ccm2todie2_lat_data", "ccm3todie2_lat_data"]:
-        data = {ds: run_parser("mem_lat_parser.py", f"{DATA_DIR}/{ds}/ccm_to_mem_lat/{fname}") for ds in DATASETS}
+        data = {}
+        for ds in DATASETS:
+            filepath = f"{DATA_DIR}/{ds}/ccm_to_mem_lat/{fname}"
+            parsed = run_parser("mem_lat_parser.py", filepath)
+            data[ds] = parsed
+            save_parsed_json(parsed, f"{DATA_DIR}/{ds}/ccm_to_mem_lat/{fname}_parsed.json")
 
         for die in ["DIE2"]:
             latencies = {}
@@ -120,7 +144,12 @@ def compare_iom_data():
     print("IOM_DATA: Non-Cache Memory (IO) Comparison")
     print("="*90)
 
-    data = {ds: run_parser("iom_data_parser.py", f"{DATA_DIR}/{ds}/iom_data") for ds in DATASETS}
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/iom_data"
+        parsed = run_parser("iom_data_parser.py", filepath)
+        data[ds] = parsed
+        save_parsed_json(parsed, f"{DATA_DIR}/{ds}/iom_data_parsed.json")
 
     print(f"\n{'Category':<8} {'CCX Requests':>15} {'DIE Requests':>15} {'SOCKET Requests':>18} {'Socket vs CCX':>15}")
     print("-"*75)
@@ -398,7 +427,9 @@ def compare_df_data_stream():
         parsed = {}
         for ds in DATASETS:
             filepath = f"{DATA_DIR}/{ds}/df_data_stream/{fname}"
-            parsed[ds] = run_parser("liuxiu_df_data_stream_parser.py", filepath)
+            parsed_data = run_parser("liuxiu_df_data_stream_parser.py", filepath)
+            parsed[ds] = parsed_data
+            save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_data_stream/{fname}_parsed.json")
 
         for metric_name, level in config["metrics"]:
             print(f"\n{metric_name}:")
@@ -471,11 +502,16 @@ def compare_df_detail_lat():
     print("DF_DETAIL_LAT: Detailed Latency Comparison (All DIEs)")
     print("="*120)
 
-    # Parse data for all datasets
+    # Parse data for all datasets (all latency files)
     parsed = {}
+    lat_files = ["ccm2todie2_latency_data", "cs2todie2_latency_data", "iom2todie2_latency_data"]
     for ds in DATASETS:
-        filepath = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
-        parsed[ds] = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
+        for lat_fname in lat_files:
+            filepath = f"{DATA_DIR}/{ds}/df_detail_lat/{lat_fname}"
+            parsed_data = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
+            if lat_fname == "ccm2todie2_latency_data":
+                parsed[ds] = parsed_data
+            save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_detail_lat/{lat_fname}_parsed.json")
 
     # Print RDBLK SDP Transaction comparison for all DIEs
     print("\n--- RDBLK SDP Transaction Counts (All DIEs) ---")
@@ -610,25 +646,53 @@ def compare_df_queue():
     print("DF_QUEUE: Queue Metrics Comparison (All DIEs)")
     print("="*120)
 
-    # Parse data for all datasets
-    parsed = {}
-    for ds in DATASETS:
-        filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
-        parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
-
     # Section labels for df_queue (4 sections: DIE0-1, DIE2-3, DIE4-5, DIE6-7)
     section_labels = ["DIE0-1", "DIE2-3", "DIE4-5", "DIE6-7"]
+    occupancy_buckets = ["0%-25%", "25%-50%", "50%-75%", "75%-100%"]
 
-    # Metrics to compare
-    queue_metrics = [
+    # ========== CCM_QUEUE_DATA ==========
+    print("\n" + "-"*100)
+    print("CCM_QUEUE_DATA: CCM Queue Metrics")
+    print("-"*100)
+
+    # Parse data for all datasets
+    ccm_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
+        parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
+        ccm_parsed[ds] = parsed_data
+        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data_parsed.json")
+
+    # Complete CCM queue metrics - Level 1/2/3
+    ccm_queue_metrics = [
+        # REQQ (Level 1)
         ("REQQ", "Request", None, "count"),
+        ("REQQ", "Bypass Rate", None, "pct"),
+        ("REQQ", "Pick Rate", None, "pct"),
         ("REQQ", "Kill Rate", None, "pct"),
-        ("PRBQ", "Probe", None, "count"),
-        ("RSPQ", "Response", None, "count"),
+        # ORIGDQ (Level 1)
         ("ORIGDQ", "write", None, "count"),
+        ("ORIGDQ", "PrbRsp", None, "count"),
+        # PRBQ (Level 1)
+        ("PRBQ", "Probe", None, "count"),
+        ("PRBQ", "Req Bypass Rate", None, "pct"),
+        ("PRBQ", "Req Pick Rate", None, "pct"),
+        ("PRBQ", "Rsp Pick Rate", None, "pct"),
+        ("PRBQ", "Rsp kill Rate", None, "pct"),
+        # RSPQ (Level 1)
+        ("RSPQ", "Response", None, "count"),
+        ("RSPQ", "Pick Rate", None, "pct"),
+        ("RSPQ", "RdRsp Kill Rate", None, "pct"),
+        ("RSPQ", "WrRsp kill Rate", None, "pct"),
+        ("RSPQ", "SrcDn kill Rate", None, "pct"),
+        # RSPDQ (Level 1)
+        ("RSPDQ", "Response", None, "count"),
+        ("RSPDQ", "Command Bypass Rate", None, "pct"),
+        ("RSPDQ", "Data Bypass Rate", None, "pct"),
+        ("RSPDQ", "Pick Rate", None, "pct"),
     ]
 
-    for queue, l2, l3, mtype in queue_metrics:
+    for queue, l2, l3, mtype in ccm_queue_metrics:
         metric_label = f"{queue} {l2}"
         print(f"\n{metric_label}:")
         print(f"{'Section':<10} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
@@ -638,7 +702,7 @@ def compare_df_queue():
             vals_str = []
 
             for ds in DATASETS:
-                values = extract_queue_metric(parsed[ds], queue, l2, l3, section_index=section_idx)
+                values = extract_queue_metric(ccm_parsed[ds], queue, l2, l3, section_index=section_idx)
 
                 if mtype == "count":
                     total = sum(parse_value(v) for v in values)
@@ -650,13 +714,12 @@ def compare_df_queue():
 
             print(f"{section_label:<10} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
 
-    # Level 3 metrics comparison
+    # CCM Level 3 metrics comparison
     print("\n" + "-"*80)
-    print("Level 3 Metrics (DIE2-3 Section)")
+    print("CCM Queue Level 3 Metrics (DIE2-3 Section)")
     print("-"*80)
 
     # REQQ OCCUPANCY Level 3 buckets
-    occupancy_buckets = ["0%-25%", "25%-50%", "50%-75%", "75%-100%"]
     print("\n--- REQQ OCCUPANCY (Level 3) ---")
     print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
     print("-" * 60)
@@ -664,7 +727,7 @@ def compare_df_queue():
     for bucket in occupancy_buckets:
         vals_str = []
         for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], "REQQ", "OCCUPANCY", bucket, section_index=1)
+            values = extract_queue_metric(ccm_parsed[ds], "REQQ", "OCCUPANCY", bucket, section_index=1)
             pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
             avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
             vals_str.append(f"{avg:.2f}%")
@@ -679,11 +742,39 @@ def compare_df_queue():
     for reason in kill_rate_reasons:
         vals_str = []
         for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], "REQQ", "Kill Rate", reason, section_index=1)
+            values = extract_queue_metric(ccm_parsed[ds], "REQQ", "Kill Rate", reason, section_index=1)
             pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
             avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
             vals_str.append(f"{avg:.2f}%")
         print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # ORIGDQ OCCUPANCY Level 3 buckets
+    print("\n--- ORIGDQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "ORIGDQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # ORIGDQ write/PrbRsp Pick Rate Level 3
+    print("\n--- ORIGDQ Pick Rate (Level 3) ---")
+    print(f"{'Metric':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    for parent_metric in ["write", "PrbRsp"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "ORIGDQ", parent_metric, "Pick Rate", section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{parent_metric + ' Pick Rate':<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
 
     # PRBQ OCCUPANCY Level 3 buckets
     print("\n--- PRBQ OCCUPANCY (Level 3) ---")
@@ -693,7 +784,414 @@ def compare_df_queue():
     for bucket in occupancy_buckets:
         vals_str = []
         for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], "PRBQ", "OCCUPANCY", bucket, section_index=1)
+            values = extract_queue_metric(ccm_parsed[ds], "PRBQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PRBQ Req Kill Rate Level 3
+    print("\n--- PRBQ Req Kill Rate (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    vals_str = []
+    for ds in DATASETS:
+        values = extract_queue_metric(ccm_parsed[ds], "PRBQ", "Req Kill Rate", "Buffer Unavail", section_index=1)
+        pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+        avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+        vals_str.append(f"{avg:.2f}%")
+    print(f"{'Buffer Unavail':<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PRBQ Rsp kill Rate Level 3
+    print("\n--- PRBQ Rsp kill Rate (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in ["Command Buffer Unavail", "Data Buffer Unavail"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "PRBQ", "Rsp kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPQ OCCUPANCY Level 3 buckets
+    print("\n--- RSPQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "RSPQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPQ RdRsp Kill Rate Level 3
+    print("\n--- RSPQ RdRsp Kill Rate (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in ["SDP BUffer Unavail", "ReXmt", "Bypass Collision"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "RSPQ", "RdRsp Kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPQ WrRsp kill Rate Level 3
+    print("\n--- RSPQ WrRsp kill Rate (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    vals_str = []
+    for ds in DATASETS:
+        values = extract_queue_metric(ccm_parsed[ds], "RSPQ", "WrRsp kill Rate", "Buffer Unavail", section_index=1)
+        pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+        avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+        vals_str.append(f"{avg:.2f}%")
+    print(f"{'Buffer Unavail':<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPQ SrcDn kill Rate Level 3
+    print("\n--- RSPQ SrcDn kill Rate (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in ["Ordering Fail", "Buffer Unavail"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "RSPQ", "SrcDn kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPDQ OCCUPANCY Level 3 buckets
+    print("\n--- RSPDQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(ccm_parsed[ds], "RSPDQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # ========== CS_QUEUE_DATA ==========
+    print("\n" + "-"*100)
+    print("CS_QUEUE_DATA: CS Queue Metrics")
+    print("-"*100)
+
+    cs_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/cs_queue_data"
+        parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
+        cs_parsed[ds] = parsed_data
+        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/cs_queue_data_parsed.json")
+
+    # CS queue metrics - Level 1/2
+    cs_queue_metrics = [
+        # CSQ (Level 1)
+        ("CSQ", "Allocation", None, "count"),
+        ("CSQ", "Req Bypass Rate", None, "pct"),
+        ("CSQ", "Req Pick Rate", None, "pct"),
+        ("CSQ", "Prb Pick Rate", None, "pct"),
+        ("CSQ", "Rsp Bypass Rate", None, "pct"),
+        ("CSQ", "Retry Spotted Rate", None, "pct"),
+        ("CSQ", "Rsp Pick Rate", None, "pct"),
+        # PFQ (Level 1)
+        ("PFQ", "Probe", None, "count"),
+        ("PFQ", "DRQ Bank Busy", None, "pct"),
+        ("PFQ", "Index Match", None, "pct"),
+        ("PFQ", "Error Rate", None, "pct"),
+        ("PFQ", "Downgrade Rate", None, "pct"),
+        # Combine (Level 1)
+        ("Combine", "RdBlkL", None, "count"),
+        ("Combine", "RCB Hit Rate", None, "pct"),
+        ("Combine", "RCB Close", None, "count"),
+        ("Combine", "WrSized", None, "count"),
+        ("Combine", "WCB Hit Rate", None, "pct"),
+        ("Combine", "WCB Close", None, "count"),
+    ]
+
+    for queue, l2, l3, mtype in cs_queue_metrics:
+        metric_label = f"{queue} {l2}"
+        print(f"\n{metric_label}:")
+        print(f"{'Section':<10} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
+
+        for section_idx, section_label in enumerate(section_labels):
+            vals_str = []
+
+            for ds in DATASETS:
+                values = extract_queue_metric(cs_parsed[ds], queue, l2, l3, section_index=section_idx)
+
+                if mtype == "count":
+                    total = sum(parse_value(v) for v in values)
+                    vals_str.append(fmt(total))
+                else:
+                    pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+                    avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                    vals_str.append(f"{avg:.2f}%")
+
+            print(f"{section_label:<10} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # CS Level 3 metrics
+    print("\n" + "-"*80)
+    print("CS Queue Level 3 Metrics (DIE0-1 Section)")
+    print("-"*80)
+
+    # CSQ OCCUPANCY Level 3 buckets
+    print("\n--- CSQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "CSQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # CSQ Req Pick Rate Level 3 breakdown
+    print("\n--- CSQ Req Pick Rate Breakdown (Level 3) ---")
+    print(f"{'Reason':<30} {'CCX':>12} {'DIE':>12} {'SOCKET':>12}")
+    print("-" * 70)
+
+    req_pick_reasons = ["UMC Channel A Cmd Token", "UMC Channel A Data Token",
+                        "UMC Channel B Cmd Token", "UMC Channel B Data Token",
+                        "Atomic Resource", "WCB", "WDS"]
+    for reason in req_pick_reasons:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "CSQ", "Req Pick Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<30} {vals_str[0]:>12} {vals_str[1]:>12} {vals_str[2]:>12}")
+
+    # CSQ Rsp Pick Rate Level 3 breakdown
+    print("\n--- CSQ Rsp Pick Rate Breakdown (Level 3) ---")
+    print(f"{'Reason':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    rsp_pick_reasons = ["FTI Cmd Token", "FTI Data Token", "Atomic Resource", "RDS"]
+    for reason in rsp_pick_reasons:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "CSQ", "Rsp Pick Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # CSQ Wait Condition Level 3 breakdown
+    print("\n--- CSQ Wait Condition (Level 3) ---")
+    print(f"{'Condition':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    wait_conditions = ["Address Match", "Tag Match", "Large Read Match", "Data Forward"]
+    for condition in wait_conditions:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "CSQ", "Wait Condition", condition, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{condition:<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PFQ OCCUPANCY Level 3 buckets
+    print("\n--- PFQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "PFQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PFQ Downgrade Rate Level 3 breakdown
+    print("\n--- PFQ Downgrade Rate Breakdown (Level 3) ---")
+    print(f"{'Reason':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    downgrade_reasons = ["CSQ Token", "Pool Token", "No Token Stall", "CS1 Stall"]
+    for reason in downgrade_reasons:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "PFQ", "Downgrade Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # Combine RCB Hit Rate Level 3
+    print("\n--- Combine RCB Hit Rate (Level 3) ---")
+    print(f"{'Metric':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    vals_str = []
+    for ds in DATASETS:
+        values = extract_queue_metric(cs_parsed[ds], "Combine", "RCB Hit Rate", "Socket Swap Rate", section_index=0)
+        pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+        avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+        vals_str.append(f"{avg:.2f}%")
+    print(f"{'Socket Swap Rate':<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # Combine RCB Close Level 3
+    print("\n--- Combine RCB Close (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in ["Non-Combinable Operation", "CSD de-allocation"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "Combine", "RCB Close", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # Combine WCB Close Level 3
+    print("\n--- Combine WCB Close (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in ["Non-Combinable Operation", "Parent DRAM Write Issue", "Hit Threhold"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(cs_parsed[ds], "Combine", "WCB Close", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # ========== IOM_QUEUE_DATA ==========
+    print("\n" + "-"*100)
+    print("IOM_QUEUE_DATA: IOM Queue Metrics")
+    print("-"*100)
+
+    iom_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/iom_queue_data"
+        parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
+        iom_parsed[ds] = parsed_data
+        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/iom_queue_data_parsed.json")
+
+    # IOM queue metrics - Level 1/2
+    iom_queue_metrics = [
+        # REQQ (Level 1)
+        ("REQQ", "Request", None, "count"),
+        ("REQQ", "Request Size Ratio", None, "pct"),
+        ("REQQ", "Pick Rate", None, "pct"),
+        # REQDQ (Level 1)
+        ("REQDQ", "Data", None, "count"),
+        ("REQDQ", "Data Size Ratio", None, "pct"),
+        ("REQDQ", "IO Ratio", None, "pct"),
+        # RSPQ (Level 1)
+        ("RSPQ", "DF Rsp", None, "count"),
+        ("RSPQ", "DF Rsp Pick Rate", None, "pct"),
+        ("RSPQ", "WR Rsp", None, "count"),
+        ("RSPQ", "WR Rsp Pick Rate", None, "pct"),
+        ("RSPQ", "RD Rsp", None, "count"),
+        ("RSPQ", "RD Rsp Pick Rate", None, "pct"),
+    ]
+
+    # IOM uses different section structure (SKT0_IOD0, SKT0_IOD1, etc.)
+    # For simplicity, show section 0 (first IOD group)
+    print("\n(Note: IOM data shows first IOD group only)")
+
+    for queue, l2, l3, mtype in iom_queue_metrics:
+        metric_label = f"{queue} {l2}"
+        print(f"\n{metric_label}:")
+        print(f"{'CCX':>20} {'DIE':>20} {'SOCKET':>20}")
+        print("-" * 65)
+
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], queue, l2, l3, section_index=0)
+
+            if mtype == "count":
+                total = sum(parse_value(v) for v in values)
+                vals_str.append(fmt(total))
+            else:
+                pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+                avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                vals_str.append(f"{avg:.2f}%")
+
+        print(f"{vals_str[0]:>20} {vals_str[1]:>20} {vals_str[2]:>20}")
+
+    # IOM Level 3 metrics
+    print("\n" + "-"*80)
+    print("IOM Queue Level 3 Metrics")
+    print("-"*80)
+
+    # REQQ OCCUPANCY Level 3 buckets
+    print("\n--- REQQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], "REQQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # REQQ Request Level 3
+    print("\n--- REQQ Request Breakdown (Level 3) ---")
+    print(f"{'Type':<20} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 65)
+
+    for req_type in ["Normal Request", "IOS Response"]:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], "REQQ", "Request", req_type, section_index=0)
+            total = sum(parse_value(v) for v in values)
+            vals_str.append(fmt(total))
+        print(f"{req_type:<20} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # REQQ Pick Rate Level 3
+    print("\n--- REQQ Pick Rate Breakdown (Level 3) ---")
+    print(f"{'Reason':<35} {'CCX':>12} {'DIE':>12} {'SOCKET':>12}")
+    print("-" * 75)
+
+    pick_rate_reasons = ["Token Unavail or RSPQ Full", "Large Read Cancel", "Token Unavail or Large Read Cancel"]
+    for reason in pick_rate_reasons:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], "REQQ", "Pick Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<35} {vals_str[0]:>12} {vals_str[1]:>12} {vals_str[2]:>12}")
+
+    # REQDQ OCCUPANCY Level 3 buckets
+    print("\n--- REQDQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], "REQDQ", "OCCUPANCY", bucket, section_index=0)
             pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
             avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
             vals_str.append(f"{avg:.2f}%")
@@ -707,11 +1205,52 @@ def compare_df_queue():
     for bucket in occupancy_buckets:
         vals_str = []
         for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], "RSPQ", "OCCUPANCY", bucket, section_index=1)
+            values = extract_queue_metric(iom_parsed[ds], "RSPQ", "OCCUPANCY", bucket, section_index=0)
             pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
             avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
             vals_str.append(f"{avg:.2f}%")
         print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPDQ OCCUPANCY Level 3 buckets
+    print("\n--- RSPDQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(iom_parsed[ds], "RSPDQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PCIe Order Fail Rate (standalone metric at end of file)
+    print("\n--- PCIe Order Fail Rate ---")
+    print(f"{'CCX':>20} {'DIE':>20} {'SOCKET':>20}")
+    print("-" * 65)
+
+    vals_str = []
+    for ds in DATASETS:
+        # This is a standalone metric, try to find it
+        if iom_parsed[ds] and "sections" in iom_parsed[ds]:
+            sections = iom_parsed[ds].get("sections", [])
+            if sections:
+                for q in sections[0].get("queue_types", []):
+                    if q.get("name") == "PCIe Order Fail Rate":
+                        values = q.get("level2_metrics", [])
+                        if values:
+                            # It's actually at Level 1
+                            vals_str.append("N/A")
+                            break
+                else:
+                    vals_str.append("N/A")
+            else:
+                vals_str.append("N/A")
+        else:
+            vals_str.append("N/A")
+    if len(vals_str) == 3:
+        print(f"{vals_str[0]:>20} {vals_str[1]:>20} {vals_str[2]:>20}")
 
 
 def print_summary():
