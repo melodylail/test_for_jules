@@ -560,6 +560,70 @@ def compare_df_queue():
 
             print(f"{section_label:<10} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
 
+    # Level 3 metrics comparison
+    print("\n" + "-"*80)
+    print("Level 3 Metrics (DIE2-3 Section)")
+    print("-"*80)
+
+    # REQQ OCCUPANCY Level 3 buckets
+    occupancy_buckets = ["0%-25%", "25%-50%", "50%-75%", "75%-100%"]
+    print("\n--- REQQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(parsed[ds], "REQQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # REQQ Kill Rate Level 3 breakdown
+    kill_rate_reasons = ["Command Token Unavail", "Data Token Unavail", "RSPQ Unavail", "RSPD Unavail"]
+    print("\n--- REQQ Kill Rate Breakdown (Level 3) ---")
+    print(f"{'Reason':<25} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 70)
+
+    for reason in kill_rate_reasons:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(parsed[ds], "REQQ", "Kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{reason:<25} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # PRBQ OCCUPANCY Level 3 buckets
+    print("\n--- PRBQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(parsed[ds], "PRBQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+    # RSPQ OCCUPANCY Level 3 buckets
+    print("\n--- RSPQ OCCUPANCY (Level 3) ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in occupancy_buckets:
+        vals_str = []
+        for ds in DATASETS:
+            values = extract_queue_metric(parsed[ds], "RSPQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            vals_str.append(f"{avg:.2f}%")
+        print(f"{bucket:<15} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
+
+
 def print_summary():
     """Print summary of differences."""
     print("\n" + "="*90)
