@@ -85,6 +85,20 @@ def parse_df_queue(filepath):
         # Pattern: "|-  MetricName  values..." or "|_  MetricName  values..."
         if first_part in ['|-', '|_']:
             metric_name = parts[1] if len(parts) > 1 else None
+
+            # Check if next part is also a pipe (nested Level 2 header like "|-  |_  MetricName")
+            # This is actually a Level 3 metric under the current Level 2
+            if metric_name in ['|-', '|_'] and len(parts) > 2:
+                actual_metric_name = parts[2]
+                values = extract_values(parts[3:]) if len(parts) > 3 else []
+                if actual_metric_name and current_level2:
+                    current_level2["level3_metrics"].append({
+                        "name": actual_metric_name,
+                        "values": values,
+                        "raw_line": line_stripped
+                    })
+                continue
+
             values = extract_values(parts[2:]) if len(parts) > 2 else []
 
             if metric_name and current_level1:

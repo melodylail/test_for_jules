@@ -557,4 +557,5 @@ if __name__ == "__main__":
     compare_iom_data()
     compare_df_data_stream()
     compare_df_detail_lat()
+    compare_df_queue()
     print_summary()
