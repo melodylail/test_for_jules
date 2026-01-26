@@ -307,6 +307,26 @@ def visualize_df_data_stream():
             # Response (Level 1)
             "SrcDn", "Probe Response", "Single", "Multiple", "With Data", "MemFetch"
         ],
+        "cs_out_data": [
+            # Requests to UMC (Level 1)
+            "Requests to UMC", "RdBlkS", "RdSizedNC", "WrSizedNC",
+            # Probes (Level 1)
+            "Probes", "Directed Probe", "Multicast Probe",
+            # Response (Level 1)
+            "Target Done", "With Data", "Without Data"
+        ],
+        "spf_in_data": [
+            # Level 1 metrics
+            "RdSized", "RdBlkC", "RdBlkL", "RdBlkX", "ChgToX", "VicBlkFull"
+        ],
+        "spf_out_data": [
+            # Target (Level 1)
+            "Target", "None", "Directed", "Multicast",
+            # Status (Level 1)
+            "Miss", "Hit",
+            # State (Level 1)
+            "State I", "State F", "State X"
+        ],
     }
 
     for fname, metrics in files_metrics.items():

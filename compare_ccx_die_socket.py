@@ -309,9 +309,84 @@ def compare_df_data_stream():
         "cs_out_data": {
             "title": "CS_OUT_DATA (Requests from CS to UMC/Memory)",
             "metrics": [
-                ("Requests to UMC", 2),    # Level 2
-                ("RdBlkS", 2),             # Level 2
+                # Requests to UMC (Level 1)
+                ("Requests to UMC", 1),    # Level 1
+                ("RdBlkS", 2),             # Level 2 under Requests to UMC
+                ("RdSizedNC", 2),          # Level 2
                 ("WrSizedNC", 2),          # Level 2
+                ("QosControl for FT", 2),  # Level 2
+                # Probes (Level 1)
+                ("Probes", 1),             # Level 1
+                ("Directed Probe", 3),     # Level 3 under Target
+                ("Multicast Probe", 3),    # Level 3 under Target
+                ("Response To Target", 3), # Level 3 under Hop
+                ("Response To Source", 3), # Level 3 under Hop
+                ("Probe Migrate", 3),      # Level 3 under Type
+                ("Probe Invalidate", 3),   # Level 3 under Type
+                # Response (Level 1)
+                ("Target Done", 2),        # Level 2 under Response
+                ("With Data", 3),          # Level 3 under Target Done
+                ("Without Data", 3),       # Level 3 under Target Done
+            ]
+        },
+        "iom_out_todie2_data": {
+            "title": "IOM_OUT_TODIE2_DATA (IO to Memory Requests)",
+            "metrics": [
+                # DRAM-Request (Level 1)
+                ("DRAM-RdSz", 2),              # Level 2
+                ("DRAM-Large-RdSz", 3),        # Level 3 under DRAM-RdSz
+                ("DRAM-WrSz", 2),              # Level 2
+                ("DRAM-Atomic", 2),            # Level 2
+                ("Fence", 2),                  # Level 2
+                ("Flush", 2),                  # Level 2
+                ("IOS-Response", 2),           # Level 2
+                # P2P Traffic (Level 1)
+                ("IO-RdSz", 2),                # Level 2 under P2P Traffic
+                ("IO-Post-WrSz", 2),           # Level 2
+                # Interrupt (Level 1)
+                ("Pie Interrupt", 2),          # Level 2 under Interrupt
+            ]
+        },
+        "spf_in_data": {
+            "title": "SPF_IN_DATA (Requests into SPF)",
+            "metrics": [
+                # All Level 1 metrics
+                ("RdSized", 1),
+                ("RdBlkS", 1),
+                ("RdBlkC", 1),
+                ("RdBlkL", 1),
+                ("RdBlkX", 1),
+                ("ChgToX", 1),
+                ("WrSized", 1),
+                ("VicBlkCln", 1),
+                ("VicBlkFull", 1),
+                ("Rinsing VBE", 1),
+                ("SrcDone update: ChgStO", 1),
+                ("SrcDone update: ChgStX", 1),
+            ]
+        },
+        "spf_out_data": {
+            "title": "SPF_OUT_DATA (Responses from SPF)",
+            "metrics": [
+                # Target (Level 1)
+                ("Target", 1),
+                ("None", 2),               # Level 2 under Target
+                ("Directed", 2),           # Level 2 under Target
+                ("Multicast", 2),          # Level 2 under Target
+                # Status (Level 1)
+                ("Status", 1),
+                ("Miss", 2),               # Level 2 under Status
+                ("Hit", 2),                # Level 2 under Status
+                # Update (Level 1)
+                ("Update", 1),
+                ("Update required on SPF Response", 2),  # Level 2
+                ("Update required on SRC Done", 2),      # Level 2
+                # State (Level 1)
+                ("State", 1),
+                ("State I", 2),            # Level 2 under State
+                ("State S", 2),            # Level 2 under State
+                ("State F", 2),            # Level 2 under State
+                ("State X", 2),            # Level 2 under State
             ]
         },
     }
