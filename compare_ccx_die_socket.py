@@ -327,28 +327,39 @@ def extract_detail_lat_metric(parsed_data, tx_type, metric_l2, metric_l3=None, d
     if not parsed_data or "sections" not in parsed_data:
         return 0
 
-    for section in parsed_data.get("sections", []):
-        for tx in section.get("transaction_types", []):
-            if tx.get("name") != tx_type:
+    sections = parsed_data.get("sections", [])
+
+    # Determine which section and local die index to use
+    # Section 0: DIE0-3, Section 1: DIE4-7
+    section_index = die_index // 4
+    local_die_index = die_index % 4
+
+    if section_index >= len(sections):
+        return 0
+
+    section = sections[section_index]
+
+    for tx in section.get("transaction_types", []):
+        if tx.get("name") != tx_type:
+            continue
+
+        for m2 in tx.get("level2_metrics", []):
+            if m2.get("name") != metric_l2:
                 continue
 
-            for m2 in tx.get("level2_metrics", []):
-                if m2.get("name") != metric_l2:
-                    continue
+            if metric_l3 is None:
+                # Return Level 2 values
+                values = m2.get("values", [])
+                return sum_die_values(values, local_die_index)
 
-                if metric_l3 is None:
-                    # Return Level 2 values
-                    values = m2.get("values", [])
-                    return sum_die_values(values, die_index)
-
-                for m3 in m2.get("level3_metrics", []):
-                    if m3.get("name") == metric_l3:
-                        values = m3.get("values", [])
-                        # For histogram percentages, return a single value
-                        if "%" in str(values[0]) if values else False:
-                            idx = die_index * 4  # CCM0 of the DIE
-                            return values[idx] if len(values) > idx else "N/A"
-                        return sum_die_values(values, die_index)
+            for m3 in m2.get("level3_metrics", []):
+                if m3.get("name") == metric_l3:
+                    values = m3.get("values", [])
+                    # For histogram percentages, return a single value
+                    if "%" in str(values[0]) if values else False:
+                        idx = local_die_index * 4  # CCM0 of the DIE
+                        return values[idx] if len(values) > idx else "N/A"
+                    return sum_die_values(values, local_die_index)
 
     return 0
 
