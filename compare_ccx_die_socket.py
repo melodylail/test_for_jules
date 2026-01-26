@@ -473,8 +473,8 @@ def compare_df_queue():
         filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
         parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
 
-    # Print CCM Queue comparison
-    print("\n--- CCM Queue Metrics (Section 0: DIE0-1) ---")
+    # Print CCM Queue comparison - Section 1 contains DIE2-3 (consistent with other DIE2 comparisons)
+    print("\n--- CCM Queue Metrics (Section 1: DIE2-3) ---")
     print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18} {'Observation':<20}")
     print("-" * 100)
 
@@ -494,7 +494,7 @@ def compare_df_queue():
         vals_str = []
 
         for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], queue, l2, l3, section_index=0)
+            values = extract_queue_metric(parsed[ds], queue, l2, l3, section_index=1)
 
             if mtype == "count":
                 # Sum all values in section
