@@ -598,11 +598,12 @@ def visualize_df_detail_lat():
     plt.close()
     print("    Saved: ccm_all_tx_types_avg_lat.png")
 
-    # 4. Latency histograms for key transaction types (DIE2)
-    key_tx_types = ["RDBLK", "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
+    # 4. Latency histograms for all transaction types (DIE2)
+    # Include all 8 transaction types: RDBLK, RDSIZED, RDSIZEDNC, WRSIZED, WRSIZEDNC, DIRTY_VICTIM, CLEAN_VICITM, ATOMIC
+    all_tx_types_for_histogram = transaction_types  # Use all 8 types
     x_hist = np.arange(len(latency_buckets))
 
-    for tx_type in key_tx_types:
+    for tx_type in all_tx_types_for_histogram:
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
         fig.suptitle(f'CCM2TODIE2: {tx_type} Latency Histogram (Level 3) - DIE2', fontsize=14, fontweight='bold')
 
