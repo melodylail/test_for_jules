@@ -256,9 +256,9 @@ def fmt(v):
 
 def compare_df_data_stream():
     """Compare all data flow stream metrics using new parser with Level 1/2/3 hierarchy."""
-    print("\n" + "="*90)
-    print("DF_DATA_STREAM: Complete Comparison (DIE2 Totals)")
-    print("="*90)
+    print("\n" + "="*120)
+    print("DF_DATA_STREAM: Complete Comparison (All DIEs)")
+    print("="*120)
 
     files_and_metrics = {
         "ccm_in_data": {
@@ -266,9 +266,6 @@ def compare_df_data_stream():
             "metrics": [
                 ("Data Transfer", 1),      # Level 1 metric
                 ("No Data Transfer", 1),   # Level 1 metric
-                ("State/PassD", 1),        # Level 1 metric
-                ("Inv_NoPassD", 2),        # Level 2 under State/PassD
-                ("Inv_PassD", 2),          # Level 2 under State/PassD
                 ("PrbSrc", 1),             # Level 1 metric
                 ("PrbTgt", 1),             # Level 1 metric
             ]
@@ -279,10 +276,8 @@ def compare_df_data_stream():
                 ("RdBlkAny", 2),           # Level 2 under Request to DRAM
                 ("RdBlkL", 3),             # Level 3 under RdBlkAny
                 ("RdBlkC", 3),             # Level 3 under RdBlkAny
-                ("SpecDramRd", 2),         # Level 2
                 ("VICBLKCLN", 2),          # Level 2
                 ("VICBLKFULL", 2),         # Level 2
-                ("CHGTOX", 2),             # Level 2
             ]
         },
         "cs_in_data": {
@@ -290,11 +285,8 @@ def compare_df_data_stream():
             "metrics": [
                 ("ChgToX", 2),             # Level 2 under Request
                 ("VicBlk", 2),             # Level 2
-                ("VicBlkFull", 3),         # Level 3 under VicBlk
-                ("VicBlkCln", 3),          # Level 3 under VicBlk
                 ("RdBlk", 2),              # Level 2
                 ("RdBlkL", 3),             # Level 3 under RdBlk
-                ("RdBlkX", 3),             # Level 3
                 ("RdBlkC", 3),             # Level 3
                 ("SrcDn", 2),              # Level 2 under Response
             ]
@@ -304,33 +296,13 @@ def compare_df_data_stream():
             "metrics": [
                 ("Requests to UMC", 2),    # Level 2
                 ("RdBlkS", 2),             # Level 2
-                ("RdSizedNC", 2),          # Level 2
                 ("WrSizedNC", 2),          # Level 2
             ]
         },
-        "spf_in_data": {
-            "title": "SPF_IN_DATA (Requests into SPF)",
-            "metrics": [
-                ("RdSized", 2),            # Level 2
-                ("RdBlkL", 2),             # Level 2
-                ("VicBlkFull", 2),         # Level 2
-                ("ChgToX", 2),             # Level 2
-            ]
-        },
-        "spf_out_data": {
-            "title": "SPF_OUT_DATA (Responses from SPF)",
-            "metrics": [
-                ("Target", 2),             # Level 2
-                ("Miss", 2),               # Level 2
-                ("Hit", 2),                # Level 2
-            ]
-        }
     }
 
     for fname, config in files_and_metrics.items():
         print(f"\n--- {config['title']} ---")
-        print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
-        print("-" * 80)
 
         # Parse data for all datasets
         parsed = {}
@@ -339,11 +311,16 @@ def compare_df_data_stream():
             parsed[ds] = run_parser("liuxiu_df_data_stream_parser.py", filepath)
 
         for metric_name, level in config["metrics"]:
-            vals = []
-            for ds in DATASETS:
-                val = extract_metric_values_from_parsed(parsed[ds], metric_name, die_index=2)
-                vals.append(val)
-            print(f"{metric_name:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
+            print(f"\n{metric_name}:")
+            print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+            print("-" * 55)
+
+            for die_idx in range(8):
+                vals = []
+                for ds in DATASETS:
+                    val = extract_metric_values_from_parsed(parsed[ds], metric_name, die_index=die_idx)
+                    vals.append(val)
+                print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
 def extract_detail_lat_metric(parsed_data, tx_type, metric_l2, metric_l3=None, die_index=2):
     """Extract metric from df_detail_lat parsed data.
@@ -400,9 +377,9 @@ def extract_detail_lat_metric(parsed_data, tx_type, metric_l2, metric_l3=None, d
 
 def compare_df_detail_lat():
     """Compare detailed latency data using new parser with Level 1/2/3 hierarchy."""
-    print("\n" + "="*90)
-    print("DF_DETAIL_LAT: Detailed Latency Comparison")
-    print("="*90)
+    print("\n" + "="*120)
+    print("DF_DETAIL_LAT: Detailed Latency Comparison (All DIEs)")
+    print("="*120)
 
     # Parse data for all datasets
     parsed = {}
@@ -410,60 +387,56 @@ def compare_df_detail_lat():
         filepath = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
         parsed[ds] = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
 
-    # Print RDBLK Transaction comparison
-    print("\n--- RDBLK Transaction Counts ---")
-    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
-    print("-" * 80)
+    # Print RDBLK SDP Transaction comparison for all DIEs
+    print("\n--- RDBLK SDP Transaction Counts (All DIEs) ---")
+    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 55)
 
-    metrics = [
-        ("RDBLK", "Transaction", "SDP", 0, "RDBLK SDP DIE0"),
-        ("RDBLK", "Transaction", "SDP", 1, "RDBLK SDP DIE1"),
-        ("RDBLK", "Transaction", "SDP", 2, "RDBLK SDP DIE2"),
-        ("RDBLK", "Transaction", "SDP", 3, "RDBLK SDP DIE3"),
-        ("RDBLK", "Transaction", "FTI", 2, "RDBLK FTI DIE2"),
-    ]
-
-    for tx, l2, l3, die_idx, label in metrics:
+    for die_idx in range(8):
         vals = []
         for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], tx, l2, l3, die_idx)
+            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "Transaction", "SDP", die_idx)
             vals.append(val if isinstance(val, (int, float)) else 0)
-        print(f"{label:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
+        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
-    # Print AVG LAT
-    print(f"\n{'RDBLK Avg Latency DIE2':<25}", end="")
-    for ds in DATASETS:
-        val = extract_detail_lat_metric(parsed[ds], "RDBLK", "AVG LAT(ns)", "SDP", 2)
-        if isinstance(val, (int, float)) and val > 0:
-            print(f"{val:>18.0f} ns", end="")
-        else:
-            print(f"{'N/A':>18}", end="")
-    print()
+    # Print RDBLK FTI Transaction comparison for all DIEs
+    print("\n--- RDBLK FTI Transaction Counts (All DIEs) ---")
+    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 55)
 
-    # Print DIRTY_VICTIM comparison
-    print("\n--- DIRTY_VICTIM Transaction Counts ---")
-    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
-    print("-" * 80)
+    for die_idx in range(8):
+        vals = []
+        for ds in DATASETS:
+            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "Transaction", "FTI", die_idx)
+            vals.append(val if isinstance(val, (int, float)) else 0)
+        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
-    for die_idx, label in [(2, "DIRTY_VICTIM SDP DIE2")]:
+    # Print AVG LAT for all DIEs
+    print("\n--- RDBLK SDP Avg Latency (All DIEs) ---")
+    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 55)
+
+    for die_idx in range(8):
+        vals = []
+        for ds in DATASETS:
+            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "AVG LAT(ns)", "SDP", die_idx)
+            if isinstance(val, (int, float)) and val > 0:
+                vals.append(f"{val:.0f} ns")
+            else:
+                vals.append("N/A")
+        print(f"DIE{die_idx:<5} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
+    # Print DIRTY_VICTIM SDP comparison for all DIEs
+    print("\n--- DIRTY_VICTIM SDP Transaction Counts (All DIEs) ---")
+    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 55)
+
+    for die_idx in range(8):
         vals = []
         for ds in DATASETS:
             val = extract_detail_lat_metric(parsed[ds], "DIRTY_VICTIM", "Transaction", "SDP", die_idx)
             vals.append(val if isinstance(val, (int, float)) else 0)
-        print(f"{label:<25} {fmt(vals[0]):>18} {fmt(vals[1]):>18} {fmt(vals[2]):>18}")
-
-    # Print latency histogram
-    print("\n--- RDBLK SDP Latency Histogram (DIE2 CCM0) ---")
-    print(f"{'Latency Bucket':<15} {'CCX':>18} {'DIE':>18} {'SOCKET':>18}")
-    print("-" * 70)
-
-    buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
-    for bucket in buckets:
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "SDP Latency Histogram", bucket, 2)
-            vals.append(val if val else "N/A")
-        print(f"{bucket:<15} {str(vals[0]):>18} {str(vals[1]):>18} {str(vals[2]):>18}")
+        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
 
 def extract_queue_metric(parsed_data, queue_type, metric_l2, metric_l3=None, section_index=0):
@@ -508,9 +481,9 @@ def extract_queue_metric(parsed_data, queue_type, metric_l2, metric_l3=None, sec
 
 def compare_df_queue():
     """Compare queue metrics using new parser with Level 1/2/3 hierarchy."""
-    print("\n" + "="*90)
-    print("DF_QUEUE: Queue Metrics Comparison")
-    print("="*90)
+    print("\n" + "="*120)
+    print("DF_QUEUE: Queue Metrics Comparison (All DIEs)")
+    print("="*120)
 
     # Parse data for all datasets
     parsed = {}
@@ -518,56 +491,39 @@ def compare_df_queue():
         filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
         parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
 
-    # Print CCM Queue comparison - Section 1 contains DIE2-3 (consistent with other DIE2 comparisons)
-    print("\n--- CCM Queue Metrics (Section 1: DIE2-3) ---")
-    print(f"{'Metric':<25} {'CCX':>18} {'DIE':>18} {'SOCKET':>18} {'Observation':<20}")
-    print("-" * 100)
+    # Section labels for df_queue (4 sections: DIE0-1, DIE2-3, DIE4-5, DIE6-7)
+    section_labels = ["DIE0-1", "DIE2-3", "DIE4-5", "DIE6-7"]
 
-    metrics = [
-        ("REQQ", "Request", None, "count", "REQQ Requests"),
-        ("REQQ", "Bypass Rate", None, "pct", "REQQ Bypass Rate"),
-        ("REQQ", "Kill Rate", None, "pct", "REQQ Kill Rate"),
-        ("PRBQ", "Probe", None, "count", "PRBQ Probes"),
-        ("PRBQ", "Req Bypass Rate", None, "pct", "PRBQ Bypass Rate"),
-        ("RSPQ", "Response", None, "count", "RSPQ Responses"),
-        ("RSPQ", "RdRsp Kill Rate", None, "pct", "RSPQ Kill Rate"),
-        ("ORIGDQ", "write", None, "count", "ORIGDQ Writes"),
+    # Metrics to compare
+    queue_metrics = [
+        ("REQQ", "Request", None, "count"),
+        ("REQQ", "Kill Rate", None, "pct"),
+        ("PRBQ", "Probe", None, "count"),
+        ("RSPQ", "Response", None, "count"),
+        ("ORIGDQ", "write", None, "count"),
     ]
 
-    for queue, l2, l3, mtype, label in metrics:
-        vals_numeric = []
-        vals_str = []
+    for queue, l2, l3, mtype in queue_metrics:
+        metric_label = f"{queue} {l2}"
+        print(f"\n{metric_label}:")
+        print(f"{'Section':<10} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
 
-        for ds in DATASETS:
-            values = extract_queue_metric(parsed[ds], queue, l2, l3, section_index=1)
+        for section_idx, section_label in enumerate(section_labels):
+            vals_str = []
 
-            if mtype == "count":
-                # Sum all values in section
-                total = sum(parse_value(v) for v in values)
-                vals_numeric.append(total)
-                vals_str.append(fmt(total))
-            else:
-                # Average percentage values
-                pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
-                avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
-                vals_numeric.append(avg)
-                vals_str.append(f"{avg:.2f}%")
+            for ds in DATASETS:
+                values = extract_queue_metric(parsed[ds], queue, l2, l3, section_index=section_idx)
 
-        # Observation
-        obs = ""
-        if vals_numeric[0] != 0 and vals_numeric[2] != 0:
-            if mtype == "count":
-                ratio = vals_numeric[2] / vals_numeric[0] if vals_numeric[0] > 0 else 0
-                if ratio > 2:
-                    obs = f"SOCKET {ratio:.0f}x higher"
-                elif ratio < 0.5:
-                    obs = f"CCX {1/ratio:.0f}x higher"
-            else:
-                diff = vals_numeric[2] - vals_numeric[0]
-                if abs(diff) > 2:
-                    obs = f"SOCKET {'+' if diff > 0 else ''}{diff:.1f}%"
+                if mtype == "count":
+                    total = sum(parse_value(v) for v in values)
+                    vals_str.append(fmt(total))
+                else:
+                    pct_vals = [parse_value(v.replace('%', '')) for v in values if '%' in str(v)]
+                    avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                    vals_str.append(f"{avg:.2f}%")
 
-        print(f"{label:<25} {vals_str[0]:>18} {vals_str[1]:>18} {vals_str[2]:>18} {obs:<20}")
+            print(f"{section_label:<10} {vals_str[0]:>15} {vals_str[1]:>15} {vals_str[2]:>15}")
 
 def print_summary():
     """Print summary of differences."""
