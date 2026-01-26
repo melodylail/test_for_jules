@@ -12,10 +12,18 @@ from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data/liuxiu")
+RESULTS_DIR = os.path.join(BASE_DIR, "results/data/liuxiu")
 DATASETS = ["ccx", "die", "socket"]
 
 # Flag to control whether to dump parsed JSON files
 DUMP_PARSED_JSON = True
+
+
+def get_results_path(ds, subdir, filename):
+    """Get the path for saving parsed JSON in results/data folder."""
+    if subdir:
+        return os.path.join(RESULTS_DIR, ds, subdir, f"{filename}_parsed.json")
+    return os.path.join(RESULTS_DIR, ds, f"{filename}_parsed.json")
 
 
 def save_parsed_json(parsed_data, output_path):
@@ -71,7 +79,7 @@ def compare_cm_data():
         filepath = f"{DATA_DIR}/{ds}/cm_data"
         parsed = run_parser("cm_data_parser.py", filepath)
         data[ds] = parsed
-        save_parsed_json(parsed, f"{DATA_DIR}/{ds}/cm_data_parsed.json")
+        save_parsed_json(parsed, get_results_path(ds, None, "cm_data"))
 
     # Build comparison table
     results = defaultdict(dict)
@@ -118,7 +126,7 @@ def compare_latency():
             filepath = f"{DATA_DIR}/{ds}/ccm_to_mem_lat/{fname}"
             parsed = run_parser("mem_lat_parser.py", filepath)
             data[ds] = parsed
-            save_parsed_json(parsed, f"{DATA_DIR}/{ds}/ccm_to_mem_lat/{fname}_parsed.json")
+            save_parsed_json(parsed, get_results_path(ds, "ccm_to_mem_lat", fname))
 
         for die in ["DIE2"]:
             latencies = {}
@@ -149,7 +157,7 @@ def compare_iom_data():
         filepath = f"{DATA_DIR}/{ds}/iom_data"
         parsed = run_parser("iom_data_parser.py", filepath)
         data[ds] = parsed
-        save_parsed_json(parsed, f"{DATA_DIR}/{ds}/iom_data_parsed.json")
+        save_parsed_json(parsed, get_results_path(ds, None, "iom_data"))
 
     print(f"\n{'Category':<8} {'CCX Requests':>15} {'DIE Requests':>15} {'SOCKET Requests':>18} {'Socket vs CCX':>15}")
     print("-"*75)
@@ -429,7 +437,7 @@ def compare_df_data_stream():
             filepath = f"{DATA_DIR}/{ds}/df_data_stream/{fname}"
             parsed_data = run_parser("liuxiu_df_data_stream_parser.py", filepath)
             parsed[ds] = parsed_data
-            save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_data_stream/{fname}_parsed.json")
+            save_parsed_json(parsed_data, get_results_path(ds, "df_data_stream", fname))
 
         for metric_name, level in config["metrics"]:
             print(f"\n{metric_name}:")
@@ -511,7 +519,7 @@ def compare_df_detail_lat():
             parsed_data = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
             if lat_fname == "ccm2todie2_latency_data":
                 parsed[ds] = parsed_data
-            save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_detail_lat/{lat_fname}_parsed.json")
+            save_parsed_json(parsed_data, get_results_path(ds, "df_detail_lat", lat_fname))
 
     # Print RDBLK SDP Transaction comparison for all DIEs
     print("\n--- RDBLK SDP Transaction Counts (All DIEs) ---")
@@ -661,7 +669,7 @@ def compare_df_queue():
         filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
         parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
         ccm_parsed[ds] = parsed_data
-        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data_parsed.json")
+        save_parsed_json(parsed_data, get_results_path(ds, "df_queue", "ccm_queue_data"))
 
     # Complete CCM queue metrics - Level 1/2/3
     ccm_queue_metrics = [
@@ -896,7 +904,7 @@ def compare_df_queue():
         filepath = f"{DATA_DIR}/{ds}/df_queue/cs_queue_data"
         parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
         cs_parsed[ds] = parsed_data
-        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/cs_queue_data_parsed.json")
+        save_parsed_json(parsed_data, get_results_path(ds, "df_queue", "cs_queue_data"))
 
     # CS queue metrics - Level 1/2
     cs_queue_metrics = [
@@ -1091,7 +1099,7 @@ def compare_df_queue():
         filepath = f"{DATA_DIR}/{ds}/df_queue/iom_queue_data"
         parsed_data = run_parser("liuxiu_df_queue_parser.py", filepath)
         iom_parsed[ds] = parsed_data
-        save_parsed_json(parsed_data, f"{DATA_DIR}/{ds}/df_queue/iom_queue_data_parsed.json")
+        save_parsed_json(parsed_data, get_results_path(ds, "df_queue", "iom_queue_data"))
 
     # IOM queue metrics - Level 1/2
     iom_queue_metrics = [
