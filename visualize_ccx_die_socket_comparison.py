@@ -213,45 +213,77 @@ def visualize_cm_data():
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle('Core-to-Memory Bandwidth Comparison (All DIEs)', fontsize=14, fontweight='bold')
 
-    # Load data
+    # Load data using correct parser
     data = {}
     for ds in DATASETS:
         filepath = f"{DATA_DIR}/{ds}/cm_data"
         if os.path.exists(filepath):
-            parsed = run_parser("liuxiu_simple_data_parser.py", filepath)
+            parsed = run_parser("cm_data_parser.py", filepath)
             data[ds] = parsed
 
     dies = [f"DIE{i}" for i in range(8)]
     x = np.arange(len(dies))
     width = 0.25
 
-    # Extract CS_RD_Total
-    for ax_idx, (metric_key, title) in enumerate([("CS_RD_Total", "CS Read Total"), ("TOTAL_BW", "Total Bandwidth")]):
-        ax = axes[ax_idx]
+    # Chart 1: CS Read Total (sum of CS0_RD through CS3_RD)
+    ax = axes[0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
 
-        for i, ds in enumerate(DATASETS):
-            if ds not in data or not data[ds]:
-                continue
+        values = []
+        for die in dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == die:
+                    # Sum all CS read columns
+                    val = sum(parse_value(entry.get(f"CS{j}_RD", 0)) for j in range(4))
+                    break
+            values.append(val)
 
-            values = []
-            for die in dies:
-                val = 0
-                for entry in data[ds]:
-                    if entry.get("Category") == die:
-                        val = parse_value(entry.get(metric_key, 0))
-                        break
-                values.append(val)
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
 
-            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
-                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+    ax.set_xlabel('DIE', fontsize=11)
+    ax.set_ylabel('Value (Millions)', fontsize=11)
+    ax.set_title('CS Read Total (CS0-CS3)', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
 
-        ax.set_xlabel('DIE', fontsize=11)
-        ax.set_ylabel('Value (Millions)' if 'Total' in title else 'Bandwidth (MB/s)', fontsize=11)
-        ax.set_title(title, fontsize=12)
-        ax.set_xticks(x)
-        ax.set_xticklabels(dies)
-        ax.legend()
-        ax.grid(axis='y', alpha=0.3)
+    # Chart 2: Total Bandwidth
+    ax = axes[1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for die in dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == die:
+                    bw_str = entry.get("TOTAL_BW", "0")
+                    # Parse bandwidth (e.g., "90 MB/s", "19 GB/s")
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('DIE', fontsize=11)
+    ax.set_ylabel('Bandwidth (MB/s)', fontsize=11)
+    ax.set_title('Total Bandwidth', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
 
     plt.tight_layout()
     plt.savefig(os.path.join(OUTPUT_DIR, 'cm_data_all_dies.png'), dpi=300, bbox_inches='tight')
@@ -538,7 +570,7 @@ def create_summary_dashboard():
     for ds in DATASETS:
         filepath = f"{DATA_DIR}/{ds}/cm_data"
         if os.path.exists(filepath):
-            data[ds] = run_parser("liuxiu_simple_data_parser.py", filepath)
+            data[ds] = run_parser("cm_data_parser.py", filepath)
 
     dies = [f"DIE{i}" for i in range(8)]
     x = np.arange(len(dies))
@@ -552,7 +584,8 @@ def create_summary_dashboard():
             val = 0
             for entry in data[ds]:
                 if entry.get("Category") == die:
-                    val = parse_value(entry.get("CS_RD_Total", 0))
+                    # Sum all CS read columns
+                    val = sum(parse_value(entry.get(f"CS{j}_RD", 0)) for j in range(4))
                     break
             values.append(val)
         ax1.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
@@ -566,13 +599,13 @@ def create_summary_dashboard():
     ax1.legend(fontsize=8)
     ax1.grid(axis='y', alpha=0.3)
 
-    # 2. IOM_DATA
+    # 2. IOM_DATA (Non-Cache Memory Requests)
     ax2 = fig.add_subplot(gs[0, 1])
     iom_data = {}
     for ds in DATASETS:
         filepath = f"{DATA_DIR}/{ds}/iom_data"
         if os.path.exists(filepath):
-            iom_data[ds] = run_parser("liuxiu_simple_data_parser.py", filepath)
+            iom_data[ds] = run_parser("iom_data_parser.py", filepath)
 
     for i, ds in enumerate(DATASETS):
         if ds not in iom_data or not iom_data[ds]:
@@ -582,13 +615,14 @@ def create_summary_dashboard():
             val = 0
             for entry in iom_data[ds]:
                 if entry.get("Category") == die:
-                    val = parse_value(entry.get("Requests", 0))
+                    # Sum all read size columns for total requests
+                    val = sum(parse_value(entry.get(f"CS{j}_RDSZ", 0)) for j in range(4))
                     break
             values.append(val)
         ax2.bar(x + (i - 1) * width, values, width,
                label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
 
-    ax2.set_title('IOM_DATA: Requests', fontsize=11)
+    ax2.set_title('IOM_DATA: Total Read Requests', fontsize=11)
     ax2.set_xlabel('DIE')
     ax2.set_ylabel('Count')
     ax2.set_xticks(x)
