@@ -182,6 +182,45 @@ def compare_iom_data():
 
         print(f"{cat:<8} {vals[0]:>15.0f} {vals[1]:>15.0f} {vals[2]:>18.0f} {ratio:>15}")
 
+def compare_di_data():
+    """Compare DI_DATA (Data Interchange between sockets)."""
+    print("\n" + "="*90)
+    print("DI_DATA: Data Translation Between Sockets")
+    print("="*90)
+
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/di_data"
+        parsed = run_parser("di_data_parser.py", filepath)
+        data[ds] = parsed
+        save_parsed_json(parsed, get_results_path(ds, None, "di_data"))
+
+    # IO DIE columns
+    io_dies = ["IO DIE0", "IO DIE1", "IO DIE2"]
+
+    print(f"\n{'Socket':<10} {'IO DIE':<10} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-"*70)
+
+    for socket in ["Socket0", "Socket1"]:
+        for io_die in io_dies:
+            vals = []
+            for ds in DATASETS:
+                rows = data.get(ds, [])
+                if rows:
+                    for row in rows:
+                        if row.get("Category") == socket:
+                            vals.append(row.get(io_die, "N/A"))
+                            break
+                    else:
+                        vals.append("N/A")
+                else:
+                    vals.append("N/A")
+
+            # Only print rows with some activity
+            if len(vals) == 3:
+                print(f"{socket:<10} {io_die:<10} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
+
 def extract_metric_values_from_parsed(parsed_data, metric_name, die_index=2, section_index=None):
     """Extract metric values from parsed JSON data using new Level 1/2/3 structure.
 
@@ -1292,6 +1331,7 @@ if __name__ == "__main__":
     compare_cm_data()
     compare_latency()
     compare_iom_data()
+    compare_di_data()
     compare_df_data_stream()
     compare_df_detail_lat()
     compare_df_queue()
