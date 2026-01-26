@@ -438,6 +438,41 @@ def compare_df_detail_lat():
             vals.append(val if isinstance(val, (int, float)) else 0)
         print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
+    # Level 3: SDP Latency Histogram buckets for RDBLK (DIE2 focus)
+    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
+
+    print("\n--- RDBLK SDP Latency Histogram (Level 3) - DIE2 ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in latency_buckets:
+        vals = []
+        for ds in DATASETS:
+            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "SDP Latency Histogram", bucket, die_index=2)
+            if isinstance(val, str) and '%' in val:
+                vals.append(val)
+            elif isinstance(val, (int, float)) and val > 0:
+                vals.append(f"{val:.2f}%")
+            else:
+                vals.append("0.00%")
+        print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
+    print("\n--- RDBLK FTI Latency Histogram (Level 3) - DIE2 ---")
+    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+    print("-" * 60)
+
+    for bucket in latency_buckets:
+        vals = []
+        for ds in DATASETS:
+            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "FTI Latency Histogram", bucket, die_index=2)
+            if isinstance(val, str) and '%' in val:
+                vals.append(val)
+            elif isinstance(val, (int, float)) and val > 0:
+                vals.append(f"{val:.2f}%")
+            else:
+                vals.append("0.00%")
+        print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
 
 def extract_queue_metric(parsed_data, queue_type, metric_l2, metric_l3=None, section_index=0):
     """Extract metric from df_queue parsed data.
