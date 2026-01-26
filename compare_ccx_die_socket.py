@@ -266,6 +266,11 @@ def compare_df_data_stream():
             "metrics": [
                 ("Data Transfer", 1),      # Level 1 metric
                 ("No Data Transfer", 1),   # Level 1 metric
+                ("State/PassD", 1),        # Level 1 metric
+                ("Inv_NoPassD", 2),        # Level 2 (Level 3 under State/PassD)
+                ("Inv_PassD", 2),          # Level 2 (Level 3 under State/PassD)
+                ("Shr_NoPassD", 2),        # Level 2 (Level 3 under State/PassD)
+                ("Shr_PassD", 2),          # Level 2 (Level 3 under State/PassD)
                 ("PrbSrc", 1),             # Level 1 metric
                 ("PrbTgt", 1),             # Level 1 metric
             ]
@@ -285,9 +290,12 @@ def compare_df_data_stream():
             "metrics": [
                 ("ChgToX", 2),             # Level 2 under Request
                 ("VicBlk", 2),             # Level 2
+                ("VicBlkFull", 3),         # Level 3 under VicBlk
+                ("VicBlkCln", 3),          # Level 3 under VicBlk
                 ("RdBlk", 2),              # Level 2
                 ("RdBlkL", 3),             # Level 3 under RdBlk
-                ("RdBlkC", 3),             # Level 3
+                ("RdBlkX", 3),             # Level 3 under RdBlk
+                ("RdBlkC", 3),             # Level 3 under RdBlk
                 ("SrcDn", 2),              # Level 2 under Response
             ]
         },
