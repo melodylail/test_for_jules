@@ -4,10 +4,10 @@ Parser for df_detail_lat files (e.g., ccm2todie2_latency_data, cs2todie2_latency
 These files contain detailed latency data with TARGET_CORE_DIE sections and transaction types.
 
 Structure:
-- Target header: TARGET_CORE_DIE:2 or SOURCE_CORE_DIE:X
-- Transaction types (Level 1): RDBLK, RDSIZED, DIRTY_VICTIM, etc.
-- Level 2 metrics: Transaction, AVG LAT(ns), SDP Latency Histogram, FTI Latency Histogram
-- Level 3 metrics: SDP, FTI, 0ns-50ns, 50ns-100ns, etc.
+- Level 1: TARGET_CORE_DIE:X or SOURCE_CORE_DIE:X (section header identifying target/source die)
+  - Transaction types: RDBLK, RDSIZED, DIRTY_VICTIM, etc. (sub-categories within Level 1)
+- Level 2: Transaction, AVG LAT(ns), SDP Latency Histogram, FTI Latency Histogram
+- Level 3: SDP, FTI, 0ns-50ns, 50ns-100ns, 100ns-150ns, etc.
 """
 
 import argparse
@@ -138,7 +138,7 @@ def parse_df_detail_lat(filepath):
                 current_level1["level2_metrics"].append(current_level2)
             continue
 
-        # Check for Level 1 (transaction type like RDBLK, RDSIZED, etc.)
+        # Check for transaction type (RDBLK, RDSIZED, etc.) - sub-category within Level 1
         # These are standalone words at the start of a line without |- prefix
         if not first_part.startswith('|') and current_section:
             # Check if this looks like a transaction type (uppercase or mixed case)
