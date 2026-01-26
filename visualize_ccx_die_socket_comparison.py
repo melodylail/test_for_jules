@@ -291,6 +291,104 @@ def visualize_cm_data():
     print("    Saved: cm_data_all_dies.png")
 
 
+def visualize_di_data():
+    """Visualize DI_DATA (Data Interchange between sockets)."""
+    print("  Creating DI_DATA visualization...")
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('DI_DATA: Data Translation Between Sockets', fontsize=14, fontweight='bold')
+
+    # Load data
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/di_data"
+        if os.path.exists(filepath):
+            data[ds] = run_parser("di_data_parser.py", filepath)
+
+    io_dies = ["IO DIE0", "IO DIE1", "IO DIE2"]
+    x = np.arange(len(io_dies))
+    width = 0.25
+
+    # Chart 1: Socket0 transfers
+    ax = axes[0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for io_die in io_dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == "Socket0":
+                    bw_str = entry.get(io_die, "0")
+                    # Parse bandwidth (e.g., "141 MB/s", "0 B/s")
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    elif "KB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("KB/s", "").strip()) * 1e3
+                    elif "B/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("B/s", "").strip())
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('IO DIE', fontsize=11)
+    ax.set_ylabel('Transfer Rate (MB/s)', fontsize=11)
+    ax.set_title('Socket0 → IO DIEs', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(io_dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # Chart 2: Socket1 transfers
+    ax = axes[1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for io_die in io_dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == "Socket1":
+                    bw_str = entry.get(io_die, "0")
+                    # Parse bandwidth
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    elif "KB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("KB/s", "").strip()) * 1e3
+                    elif "B/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("B/s", "").strip())
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('IO DIE', fontsize=11)
+    ax.set_ylabel('Transfer Rate (MB/s)', fontsize=11)
+    ax.set_title('Socket1 → IO DIEs', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(io_dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, 'di_data_socket_transfers.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: di_data_socket_transfers.png")
+
+
 def visualize_df_data_stream():
     """Visualize DF_DATA_STREAM with Level 3 metrics."""
     print("  Creating DF_DATA_STREAM visualizations...")
@@ -1473,16 +1571,19 @@ def main():
     print("\n1. Visualizing CM_DATA...")
     visualize_cm_data()
 
-    print("\n2. Visualizing DF_DATA_STREAM with Level 3...")
+    print("\n2. Visualizing DI_DATA...")
+    visualize_di_data()
+
+    print("\n3. Visualizing DF_DATA_STREAM with Level 3...")
     visualize_df_data_stream()
 
-    print("\n3. Visualizing DF_DETAIL_LAT with Level 3...")
+    print("\n4. Visualizing DF_DETAIL_LAT with Level 3...")
     visualize_df_detail_lat()
 
-    print("\n4. Visualizing DF_QUEUE with Level 3...")
+    print("\n5. Visualizing DF_QUEUE with Level 3...")
     visualize_df_queue()
 
-    print("\n5. Creating summary dashboard...")
+    print("\n6. Creating summary dashboard...")
     create_summary_dashboard()
 
     print("\n" + "=" * 70)
