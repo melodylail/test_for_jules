@@ -544,107 +544,166 @@ def extract_detail_lat_metric(parsed_data, tx_type, metric_l2, metric_l3=None, d
 
 
 def compare_df_detail_lat():
-    """Compare detailed latency data using new parser with Level 1/2/3 hierarchy."""
+    """Compare detailed latency data using new parser with Level 1/2/3 hierarchy.
+
+    Structure:
+    - Level 1: TARGET_CORE_DIE:2 (section header)
+      - Transaction Types: RDBLK, RDSIZED, RDSIZEDNC, WRSIZED, WRSIZEDNC, DIRTY_VICTIM, CLEAN_VICITM, ATOMIC
+    - Level 2: Transaction, AVG LAT(ns), SDP Latency Histogram, FTI Latency Histogram
+    - Level 3: SDP, FTI (under Transaction/AVG LAT), bucket ranges (under Histograms)
+    """
     print("\n" + "="*120)
-    print("DF_DETAIL_LAT: Detailed Latency Comparison (All DIEs)")
+    print("DF_DETAIL_LAT: Detailed Latency Comparison (TARGET_CORE_DIE:2)")
     print("="*120)
 
     # Parse data for all datasets (all latency files)
-    parsed = {}
+    parsed_ccm = {}
+    parsed_iom = {}
     lat_files = ["ccm2todie2_latency_data", "cs2todie2_latency_data", "iom2todie2_latency_data"]
     for ds in DATASETS:
         for lat_fname in lat_files:
             filepath = f"{DATA_DIR}/{ds}/df_detail_lat/{lat_fname}"
             parsed_data = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
             if lat_fname == "ccm2todie2_latency_data":
-                parsed[ds] = parsed_data
+                parsed_ccm[ds] = parsed_data
+            elif lat_fname == "iom2todie2_latency_data":
+                parsed_iom[ds] = parsed_data
             save_parsed_json(parsed_data, get_results_path(ds, "df_detail_lat", lat_fname))
 
-    # Print RDBLK SDP Transaction comparison for all DIEs
-    print("\n--- RDBLK SDP Transaction Counts (All DIEs) ---")
-    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 55)
+    # All Level 1 transaction types
+    transaction_types = ["RDBLK", "RDSIZED", "RDSIZEDNC", "WRSIZED", "WRSIZEDNC",
+                         "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
 
-    for die_idx in range(8):
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "Transaction", "SDP", die_idx)
-            vals.append(val if isinstance(val, (int, float)) else 0)
-        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
+    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns",
+                       "200ns-500ns", "500ns-1000ns", ">1000ns"]
 
-    # Print RDBLK FTI Transaction comparison for all DIEs
-    print("\n--- RDBLK FTI Transaction Counts (All DIEs) ---")
-    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 55)
+    # ========== CCM2TODIE2_LATENCY_DATA ==========
+    print("\n" + "-"*100)
+    print("CCM2TODIE2_LATENCY_DATA (Level 1: TARGET_CORE_DIE:2)")
+    print("-"*100)
 
-    for die_idx in range(8):
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "Transaction", "FTI", die_idx)
-            vals.append(val if isinstance(val, (int, float)) else 0)
-        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
+    for tx_type in transaction_types:
+        print(f"\n=== {tx_type} (Transaction Type) ===")
 
-    # Print AVG LAT for all DIEs
-    print("\n--- RDBLK SDP Avg Latency (All DIEs) ---")
-    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 55)
+        # Level 2: Transaction - Level 3: SDP
+        print(f"\n--- {tx_type} Transaction SDP (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
 
-    for die_idx in range(8):
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "AVG LAT(ns)", "SDP", die_idx)
-            if isinstance(val, (int, float)) and val > 0:
-                vals.append(f"{val:.0f} ns")
-            else:
-                vals.append("N/A")
-        print(f"DIE{die_idx:<5} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "SDP", die_idx)
+                vals.append(val if isinstance(val, (int, float)) else 0)
+            print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
-    # Print DIRTY_VICTIM SDP comparison for all DIEs
-    print("\n--- DIRTY_VICTIM SDP Transaction Counts (All DIEs) ---")
-    print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 55)
+        # Level 2: Transaction - Level 3: FTI
+        print(f"\n--- {tx_type} Transaction FTI (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
 
-    for die_idx in range(8):
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "DIRTY_VICTIM", "Transaction", "SDP", die_idx)
-            vals.append(val if isinstance(val, (int, float)) else 0)
-        print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "FTI", die_idx)
+                vals.append(val if isinstance(val, (int, float)) else 0)
+            print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
 
-    # Level 3: SDP Latency Histogram buckets for RDBLK (DIE2 focus)
-    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
+        # Level 2: AVG LAT(ns) - Level 3: SDP
+        print(f"\n--- {tx_type} AVG LAT(ns) SDP (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
 
-    print("\n--- RDBLK SDP Latency Histogram (Level 3) - DIE2 ---")
-    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 60)
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, "AVG LAT(ns)", "SDP", die_idx)
+                if isinstance(val, (int, float)) and val > 0:
+                    vals.append(f"{val:.0f} ns")
+                else:
+                    vals.append("N/A")
+            print(f"DIE{die_idx:<5} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
 
-    for bucket in latency_buckets:
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "SDP Latency Histogram", bucket, die_index=2)
-            if isinstance(val, str) and '%' in val:
-                vals.append(val)
-            elif isinstance(val, (int, float)) and val > 0:
-                vals.append(f"{val:.2f}%")
-            else:
-                vals.append("0.00%")
-        print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+        # Level 2: SDP Latency Histogram - Level 3: buckets (DIE2 focus)
+        print(f"\n--- {tx_type} SDP Latency Histogram (DIE2) ---")
+        print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 60)
 
-    print("\n--- RDBLK FTI Latency Histogram (Level 3) - DIE2 ---")
-    print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
-    print("-" * 60)
+        for bucket in latency_buckets:
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, "SDP Latency Histogram", bucket, die_index=2)
+                if isinstance(val, str) and '%' in val:
+                    vals.append(val)
+                elif isinstance(val, (int, float)) and val > 0:
+                    vals.append(f"{val:.2f}%")
+                else:
+                    vals.append("0.00%")
+            print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
 
-    for bucket in latency_buckets:
-        vals = []
-        for ds in DATASETS:
-            val = extract_detail_lat_metric(parsed[ds], "RDBLK", "FTI Latency Histogram", bucket, die_index=2)
-            if isinstance(val, str) and '%' in val:
-                vals.append(val)
-            elif isinstance(val, (int, float)) and val > 0:
-                vals.append(f"{val:.2f}%")
-            else:
-                vals.append("0.00%")
-        print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+        # Level 2: FTI Latency Histogram - Level 3: buckets (DIE2 focus)
+        print(f"\n--- {tx_type} FTI Latency Histogram (DIE2) ---")
+        print(f"{'Bucket':<15} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 60)
+
+        for bucket in latency_buckets:
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, "FTI Latency Histogram", bucket, die_index=2)
+                if isinstance(val, str) and '%' in val:
+                    vals.append(val)
+                elif isinstance(val, (int, float)) and val > 0:
+                    vals.append(f"{val:.2f}%")
+                else:
+                    vals.append("0.00%")
+            print(f"{bucket:<15} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
+    # ========== IOM2TODIE2_LATENCY_DATA ==========
+    print("\n" + "-"*100)
+    print("IOM2TODIE2_LATENCY_DATA (Level 1: TARGET_CORE_DIE:2)")
+    print("-"*100)
+
+    for tx_type in transaction_types:
+        print(f"\n=== {tx_type} (Transaction Type) ===")
+
+        # Level 2: Transaction - Level 3: SDP
+        print(f"\n--- {tx_type} Transaction SDP (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
+
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "SDP", die_idx)
+                vals.append(val if isinstance(val, (int, float)) else 0)
+            print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
+
+        # Level 2: Transaction - Level 3: FTI
+        print(f"\n--- {tx_type} Transaction FTI (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
+
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "FTI", die_idx)
+                vals.append(val if isinstance(val, (int, float)) else 0)
+            print(f"DIE{die_idx:<5} {fmt(vals[0]):>15} {fmt(vals[1]):>15} {fmt(vals[2]):>15}")
+
+        # Level 2: AVG LAT(ns) - Level 3: SDP
+        print(f"\n--- {tx_type} AVG LAT(ns) SDP (All DIEs) ---")
+        print(f"{'DIE':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
+
+        for die_idx in range(8):
+            vals = []
+            for ds in DATASETS:
+                val = extract_detail_lat_metric(parsed_iom[ds], tx_type, "AVG LAT(ns)", "SDP", die_idx)
+                if isinstance(val, (int, float)) and val > 0:
+                    vals.append(f"{val:.0f} ns")
+                else:
+                    vals.append("N/A")
+            print(f"DIE{die_idx:<5} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
 
 
 def extract_queue_metric(parsed_data, queue_type, metric_l2, metric_l3=None, section_index=0):
