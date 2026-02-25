@@ -138,6 +138,7 @@ def flatten_stream_data(data):
                     metrics[key].extend(l2["values"])
 
                 # L3 metrics
+                l3_by_prefix = {}
                 for l3 in l2.get("level3_metrics", []):
                     if l3.get("values"):
                         key = (l1_name, f"{l2['name']}/{l3['name']}")
@@ -145,6 +146,31 @@ def flatten_stream_data(data):
                             metrics[key] = []
                             metric_is_pct[key] = is_percentage(l3["values"])
                         metrics[key].extend(l3["values"])
+
+                        # Track L3 prefix groups for aggregation
+                        # e.g. "IO-Non-Post-Wrsz,data<32B" -> prefix "IO-Non-Post-Wrsz"
+                        l3_name = l3["name"]
+                        if ',' in l3_name:
+                            prefix = l3_name.split(',')[0]
+                            l3_by_prefix.setdefault(prefix, []).append(l3["values"])
+
+                # Create aggregated totals for L3 prefix groups that differ
+                # from the L2 name (e.g. IO-Non-Post-Wrsz under IO-Post-WrSz)
+                l2_base = l2["name"].lower().replace('-', '').replace(' ', '')
+                for prefix, value_lists in l3_by_prefix.items():
+                    prefix_base = prefix.lower().replace('-', '').replace(' ', '')
+                    if prefix_base != l2_base and len(value_lists) > 1:
+                        agg_key = (l1_name, f"{prefix} (total)")
+                        if agg_key not in metrics:
+                            metrics[agg_key] = []
+                            metric_is_pct[agg_key] = False
+                        # Sum values across all L3 entries with this prefix
+                        n_vals = len(value_lists[0])
+                        summed = []
+                        for vi in range(n_vals):
+                            total = sum(parse_value(vl[vi]) for vl in value_lists)
+                            summed.append(str(total))
+                        metrics[agg_key].extend(summed)
 
     return composite_labels, metrics, metric_is_pct
 
