@@ -168,8 +168,8 @@ def visualize_simple_data(filepath, output_dir):
 
 def main():
     """Main function."""
-    base_dir = "results/data/liuxiu/die"
-    output_base = "results/visualizations/liuxiu_die_simple"
+    # Process all three folder levels: ccx, die, socket
+    folder_levels = ['ccx', 'die', 'socket']
 
     # Files to visualize
     files = [
@@ -178,18 +178,26 @@ def main():
         'iom_data_parsed.json'
     ]
 
-    for filename in files:
-        filepath = os.path.join(base_dir, filename)
+    for folder in folder_levels:
+        base_dir = f"results/data/liuxiu/{folder}"
+        output_base = f"results/visualizations/liuxiu_{folder}_simple"
 
-        if not os.path.exists(filepath):
-            print(f"File not found: {filepath}")
-            continue
+        print(f"\n{'='*80}")
+        print(f"Processing {folder} data from: {base_dir}")
+        print(f"{'='*80}")
 
-        output_dir = os.path.join(output_base, Path(filename).stem.replace('_parsed', ''))
-        visualize_simple_data(filepath, output_dir)
+        for filename in files:
+            filepath = os.path.join(base_dir, filename)
+
+            if not os.path.exists(filepath):
+                print(f"File not found: {filepath}")
+                continue
+
+            output_dir = os.path.join(output_base, Path(filename).stem.replace('_parsed', ''))
+            visualize_simple_data(filepath, output_dir)
 
     print(f"\n{'='*80}")
-    print(f"All visualizations saved to: {output_base}")
+    print(f"All visualizations saved to: results/visualizations/liuxiu_{{ccx,die,socket}}_simple")
     print(f"{'='*80}")
 
 
