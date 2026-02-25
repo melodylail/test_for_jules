@@ -130,15 +130,23 @@ def flatten_sections(data):
             qt_name = qt["name"]
             for l2 in qt["level2_metrics"]:
                 l2_name = l2["name"]
-                if l2_name == "OCCUPANCY":
-                    continue  # Skip OCCUPANCY (values are in level3)
 
-                key = (qt_name, l2_name)
+                # L2 direct values
                 if l2.get("values"):
+                    key = (qt_name, l2_name)
                     if key not in metrics:
                         metrics[key] = []
                         metric_is_pct[key] = is_percentage_metric(l2_name, l2["values"])
                     metrics[key].extend(l2["values"])
+
+                # L3 metrics (OCCUPANCY buckets, Kill Rate sub-metrics, etc.)
+                for l3 in l2.get("level3_metrics", []):
+                    if l3.get("values"):
+                        key = (qt_name, f"{l2_name}/{l3['name']}")
+                        if key not in metrics:
+                            metrics[key] = []
+                            metric_is_pct[key] = is_percentage_metric(l3["name"], l3["values"])
+                        metrics[key].extend(l3["values"])
 
     return composite_labels, metrics, metric_is_pct
 
