@@ -6,6 +6,7 @@
 #   3. Cross-level comparisons for ccm0-3todie2_lat_data (ccm_to_mem_lat)
 #   4. Cross-level comparisons for df_queue (ccm_queue, cs_queue, iom_queue)
 #   5. Cross-level comparisons for df_data_stream (7 stream files)
+#   6. Cross-level comparisons for df_detail_lat (3 latency files)
 #
 
 set -e
@@ -41,6 +42,10 @@ echo "=== Running df_data_stream CCX vs DIE vs SOCKET comparison ==="
 python3 compare_df_data_stream_ccx_die_socket.py
 
 echo ""
+echo "=== Running df_detail_lat CCX vs DIE vs SOCKET comparison ==="
+python3 compare_df_detail_lat_ccx_die_socket.py
+
+echo ""
 echo "=== Done ==="
 echo "Results:"
 echo "  Per-folder:  results/visualizations/liuxiu_{ccx,die,socket}_simple/"
@@ -50,3 +55,4 @@ echo "  Comparison:  results/visualizations/iom_data_ccx_die_socket_comparison/"
 echo "  Comparison:  results/visualizations/ccm_to_mem_lat_ccx_die_socket_comparison/"
 echo "  Comparison:  results/visualizations/df_queue_ccx_die_socket_comparison/"
 echo "  Comparison:  results/visualizations/df_data_stream_ccx_die_socket_comparison/"
+echo "  Comparison:  results/visualizations/df_detail_lat_ccx_die_socket_comparison/"
