@@ -69,7 +69,7 @@ def run_parser(parser_script, data_file):
     return None
 
 def compare_cm_data():
-    """Compare CM_DATA (Core-to-Memory bandwidth)."""
+    """Compare CM_DATA (Core-to-Memory bandwidth) - all columns."""
     print("\n" + "="*90)
     print("CM_DATA: Core-to-Memory Bandwidth Comparison")
     print("="*90)
@@ -89,27 +89,40 @@ def compare_cm_data():
                 cat = row.get("Category", "")
                 results[cat][ds] = row
 
-    print(f"\n{'Category':<8} {'CCX':^30} {'DIE':^30} {'SOCKET':^30}")
-    print(f"{'':8} {'CS_RD_Total':>12} {'BW':>14} {'CS_RD_Total':>12} {'BW':>14} {'CS_RD_Total':>12} {'BW':>14}")
-    print("-"*98)
+    # All cm_data columns: 4 read channels, 4 write channels, total BW
+    cm_columns = [f"CS{i}_RD" for i in range(4)] + [f"CS{i}_WR" for i in range(4)] + ["TOTAL_BW"]
+    categories = ["DIE0", "DIE1", "DIE2", "DIE3", "DIE4", "DIE5", "DIE6", "DIE7", "SKT0", "SKT1", "SYS"]
 
-    for cat in ["DIE0", "DIE1", "DIE2", "DIE3", "DIE4", "DIE5", "DIE6", "DIE7", "SKT0", "SKT1", "SYS"]:
+    # Print per-column comparison across datasets
+    for col in cm_columns:
+        print(f"\n--- {col} ---")
+        print(f"{'Category':<8} {'CCX':>15} {'DIE':>15} {'SOCKET':>15}")
+        print("-" * 55)
+
+        for cat in categories:
+            vals = []
+            for ds in DATASETS:
+                row = results[cat].get(ds, {})
+                raw = row.get(col, "N/A")
+                vals.append(raw)
+            print(f"{cat:<8} {vals[0]:>15} {vals[1]:>15} {vals[2]:>15}")
+
+    # Summary table: read total, write total, and total BW
+    print(f"\n--- Summary: CS_RD_Total / CS_WR_Total / TOTAL_BW ---")
+    print(f"{'Category':<8} {'':2} {'CCX':^40} {'DIE':^40} {'SOCKET':^40}")
+    print(f"{'':8} {'':2} {'RD_Total':>12} {'WR_Total':>14} {'BW':>12} {'RD_Total':>12} {'WR_Total':>14} {'BW':>12} {'RD_Total':>12} {'WR_Total':>14} {'BW':>12}")
+    print("-" * 132)
+
+    for cat in categories:
         row_data = []
         for ds in DATASETS:
             row = results[cat].get(ds, {})
             rd_total = sum(parse_value(row.get(f"CS{i}_RD", 0)) for i in range(4))
+            wr_total = sum(parse_value(row.get(f"CS{i}_WR", 0)) for i in range(4))
             bw = row.get("TOTAL_BW", "N/A")
-            if rd_total >= 1e9:
-                rd_str = f"{rd_total/1e9:.1f}G"
-            elif rd_total >= 1e6:
-                rd_str = f"{rd_total/1e6:.1f}M"
-            elif rd_total >= 1e3:
-                rd_str = f"{rd_total/1e3:.0f}K"
-            else:
-                rd_str = str(int(rd_total))
-            row_data.append((rd_str, bw))
+            row_data.append((fmt(rd_total), fmt(wr_total), bw))
 
-        print(f"{cat:<8} {row_data[0][0]:>12} {row_data[0][1]:>14} {row_data[1][0]:>12} {row_data[1][1]:>14} {row_data[2][0]:>12} {row_data[2][1]:>14}")
+        print(f"{cat:<8} {'':2} {row_data[0][0]:>12} {row_data[0][1]:>14} {row_data[0][2]:>12} {row_data[1][0]:>12} {row_data[1][1]:>14} {row_data[1][2]:>12} {row_data[2][0]:>12} {row_data[2][1]:>14} {row_data[2][2]:>12}")
 
 def compare_latency():
     """Compare memory latency."""
