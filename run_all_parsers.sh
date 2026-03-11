@@ -1,73 +1,100 @@
 #!/bin/bash
+#
+# Parse all raw data files under data/liuxiu/{ccx,die,socket}/
+# and save parsed JSON to results/data/liuxiu/{ccx,die,socket}/
+#
 
-export PYTHONPATH=$PYTHONPATH:.
+set -e
 
-echo "Running all parser scripts..."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Define parser-to-data mapping
-declare -A parser_map
-parser_map["parsers/df_queue_parser.py"]="data/df_queue"
-parser_map["parsers/mem_lat_parser.py"]="data/ccm_to_mem_lat"
-parser_map["parsers/df_data_stream_parser.py"]="data/df_data_stream"
-parser_map["parsers/df_detail_lat_parser.py"]="data/df_detail_lat"
+export PYTHONPATH="$PYTHONPATH:."
 
-# Map specific parsers to files without extensions
-declare -A file_parser_map
-file_parser_map["data/di_data"]="parsers/di_data_parser.py"
-file_parser_map["data/iom_data"]="parsers/iom_data_parser.py"
-file_parser_map["data/cm_data"]="parsers/cm_data_parser.py"
+DATA_ROOT="data/liuxiu"
+RESULTS_ROOT="results/data/liuxiu"
+ERROR_LOG="error.log"
 
-# Clear previous results and error log
-rm -f results/*.json
-rm -f error.log
-touch error.log
+rm -f "$ERROR_LOG"
+touch "$ERROR_LOG"
 
-# Create results directory if it doesn't exist
-mkdir -p results
+for level in ccx die socket; do
+    echo "=============================="
+    echo "Parsing $level data..."
+    echo "=============================="
 
-# Function to run a parser on all files in a directory
-run_parser() {
-    local parser_script=$1
-    local data_dir=$2
+    SRC="$DATA_ROOT/$level"
+    DST="$RESULTS_ROOT/$level"
 
-    for data_file in "$data_dir"/*; do
-        if [ -f "$data_file" ]; then
-            local filename=$(basename "$data_file")
-            local filename_no_ext="${filename%.*}"
-            local output_file="results/${filename_no_ext}_parsed.json"
-            echo "Parsing $data_file with $parser_script..."
-            python3 "$parser_script" "$data_file" > "$output_file" 2>> error.log
-            if [ $? -ne 0 ]; then
-                echo "Failed to parse $data_file" >> error.log
-                echo "---" >> error.log
-            fi
+    if [ ! -d "$SRC" ]; then
+        echo "  Warning: $SRC not found, skipping"
+        continue
+    fi
+
+    # --- Simple file parsers (cm_data, di_data, iom_data) ---
+    for data_name in cm_data di_data iom_data; do
+        if [ -f "$SRC/$data_name" ]; then
+            mkdir -p "$DST"
+            echo "  Parsing $SRC/$data_name..."
+            python3 "parsers/${data_name}_parser.py" "$SRC/$data_name" > "$DST/${data_name}_parsed.json" 2>> "$ERROR_LOG"
         fi
     done
-}
 
-# Iterate over the directory map and run parsers
-for parser in "${!parser_map[@]}"; do
-    run_parser "$parser" "${parser_map[$parser]}"
-done
-
-# Iterate over the file map and run parsers
-for data_file in "${!file_parser_map[@]}"; do
-    parser_script="${file_parser_map[$data_file]}"
-    filename=$(basename "$data_file")
-    output_file="results/${filename}_parsed.json"
-    echo "Parsing $data_file with $parser_script..."
-    python3 "$parser_script" "$data_file" > "$output_file" 2>> error.log
-    if [ $? -ne 0 ]; then
-        echo "Failed to parse $data_file" >> error.log
-        echo "---" >> error.log
+    # --- ccm_to_mem_lat (4 files) ---
+    if [ -d "$SRC/ccm_to_mem_lat" ]; then
+        mkdir -p "$DST/ccm_to_mem_lat"
+        for data_file in "$SRC/ccm_to_mem_lat"/*; do
+            if [ -f "$data_file" ]; then
+                filename=$(basename "$data_file")
+                echo "  Parsing $data_file..."
+                python3 parsers/mem_lat_parser.py "$data_file" > "$DST/ccm_to_mem_lat/${filename}_parsed.json" 2>> "$ERROR_LOG"
+            fi
+        done
     fi
+
+    # --- df_queue (ccm_queue_data, cs_queue_data, iom_queue_data) ---
+    if [ -d "$SRC/df_queue" ]; then
+        mkdir -p "$DST/df_queue"
+        for data_file in "$SRC/df_queue"/*; do
+            if [ -f "$data_file" ]; then
+                filename=$(basename "$data_file")
+                echo "  Parsing $data_file..."
+                python3 parsers/liuxiu_df_queue_parser.py "$data_file" > "$DST/df_queue/${filename}_parsed.json" 2>> "$ERROR_LOG"
+            fi
+        done
+    fi
+
+    # --- df_data_stream (7 files) ---
+    if [ -d "$SRC/df_data_stream" ]; then
+        mkdir -p "$DST/df_data_stream"
+        for data_file in "$SRC/df_data_stream"/*; do
+            if [ -f "$data_file" ]; then
+                filename=$(basename "$data_file")
+                echo "  Parsing $data_file..."
+                python3 parsers/liuxiu_df_data_stream_parser.py "$data_file" > "$DST/df_data_stream/${filename}_parsed.json" 2>> "$ERROR_LOG"
+            fi
+        done
+    fi
+
+    # --- df_detail_lat (3 files) ---
+    if [ -d "$SRC/df_detail_lat" ]; then
+        mkdir -p "$DST/df_detail_lat"
+        for data_file in "$SRC/df_detail_lat"/*; do
+            if [ -f "$data_file" ]; then
+                filename=$(basename "$data_file")
+                echo "  Parsing $data_file..."
+                python3 parsers/liuxiu_df_detail_lat_parser.py "$data_file" > "$DST/df_detail_lat/${filename}_parsed.json" 2>> "$ERROR_LOG"
+            fi
+        done
+    fi
+
+    echo ""
 done
 
-echo "All files parsed. Results are in the 'results' directory."
+echo "All files parsed. Results in $RESULTS_ROOT/"
 
-# Report errors if any
-if [ -s error.log ]; then
+if [ -s "$ERROR_LOG" ]; then
     echo ""
     echo "Errors occurred during parsing:"
-    cat error.log
+    cat "$ERROR_LOG"
 fi
