@@ -1,0 +1,80 @@
+ Level 1          Level 2            Level 3              DIE0                            DIE1                            DIE2                            DIE3
+                                                          CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3
+ Requests to UMC                                          43 M    64 M    58 M    59 M    13 M    6599 K  4261 K  4959 K  13 M    8881 K  6725 K  6582 K  13 M    6856 K  4300 K  4817 K
+ |-               SyncFlood                               0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               QosControl for VC                       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               RdBlkS                                  31 M    46 M    42 M    44 M    10 M    5152 K  3717 K  4137 K  10 M    7455 K  6060 K  5930 K  9693 K  5313 K  3758 K  4042 K
+ |-               RdSizedNC                               3074    3101    3058    3103    3068    3060    3056    3056    3066    3059    3057    3112    3060    3067    3056    3066
+ |-               WrSizedNC                               9834 K  15 M    13 M    13 M    2758 K  994 K   254 K   507 K   2154 K  899 K   273 K   252 K   2648 K  1018 K  228 K   437 K
+ |-               QosControl for FT                       2558 K  2706 K  2470 K  2453 K  810 K   450 K   287 K   311 K   790 K   523 K   388 K   396 K   862 K   521 K   310 K   334 K
+ |_               Cancel                                  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ Probes                                                   13 M    15 M    12 M    10 M    497 K   456 K   504 K   1088 K  1442 K  1932 K  1458 K  2002 K  569 K   528 K   806 K   1207 K
+ |-               Target
+ |                |-                 Directed Probe       11 M    13 M    10 M    8895 K  356 K   327 K   375 K   849 K   1116 K  1508 K  1126 K  1574 K  417 K   396 K   599 K   926 K
+ |                |_                 Multicast Probe      1557 K  1741 K  1464 K  1430 K  141 K   128 K   128 K   239 K   325 K   424 K   332 K   428 K   151 K   132 K   207 K   280 K
+ |-               Hop
+ |                |-                 Response To Target   9024 K  11 M    8472 K  6654 K  26 K    21 K    58 K    339 K   21 K    32 K    11 K    164 K   5847    2610    43 K    287 K
+ |                |_                 Response To Source   4255 K  4007 K  3649 K  3672 K  471 K   434 K   445 K   750 K   1422 K  1900 K  1447 K  1840 K  564 K   526 K   763 K   920 K
+ |-               Type
+ |                |-                 Probe Nop            0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Share          8024    5933    8056    8454    40      60      146     374     5228    21 K    6094    14 K    129     196     437     447
+ |                |-                 Probe Fetch          6830    5362    4822    5428    3       415     338     1012    8       32      148     539     1       550     361     1696
+ |                |-                 Probe Clean          0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Migrate        3912 K  3393 K  2766 K  3187 K  288 K   425 K   511 K   739 K   1137 K  1465 K  1257 K  1525 K  396 K   515 K   791 K   826 K
+ |                |-                 Probe IC Invalidate  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Invalidate     13 M    9871 K  5683 K  6629 K  136 K   274 K   661 K   1151 K  417 K   564 K   588 K   1026 K  176 K   273 K   660 K   1047 K
+ |                |_                 Probe Steer          0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               Probe Store
+ |                |-                 By Wrsized           0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 By Vicblk            0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Reject Wrsized       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Reject Vicblk        0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 RdBlk Hit Wrsized    0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |_                 RdBlk Hit VicBlk     0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |_               Cancel                                  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |_               Early                                   0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ Response
+ |-               Target Start                            0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |_               Target Done                             58 M    52 M    53 M    56 M    8049 K  12 M    14 M    10 M    7853 K  10 M    12 M    10 M    7549 K  12 M    13 M    9844 K
+ |                |-                 With Data            31 M    26 M    31 M    37 M    5852 K  8702 K  7331 K  3118 K  4965 K  7470 K  7043 K  3762 K  5470 K  8194 K  7161 K  2891 K
+ |                |_                 Without Data         27 M    26 M    21 M    18 M    2197 K  4050 K  6812 K  7372 K  2887 K  3521 K  5431 K  6731 K  2079 K  3913 K  6407 K  6952 K
+ Level 1          Level 2            Level 3              DIE4                            DIE5                            DIE6                            DIE7
+                                                          CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3     CS0     CS1     CS2     CS3
+ Requests to UMC                                          155 K   154 K   168 K   159 K   252 K   261 K   273 K   298 K   175 K   186 K   202 K   200 K   162 K   164 K   171 K   177 K
+ |-               SyncFlood                               0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               QosControl for VC                       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               RdBlkS                                  129 K   130 K   144 K   135 K   218 K   229 K   239 K   264 K   147 K   159 K   175 K   173 K   135 K   139 K   146 K   153 K
+ |-               RdSizedNC                               3064    3129    3061    3119    3058    3099    3061    3076    3054    3053    3053    3055    3050    3053    3053    3056
+ |-               WrSizedNC                               14 K    13 K    13 K    12 K    18 K    14 K    15 K    14 K    14 K    13 K    12 K    12 K    14 K    12 K    12 K    12 K
+ |-               QosControl for FT                       8583    8160    7879    7891    13 K    13 K    15 K    16 K    10 K    11 K    11 K    10 K    9714    9447    9306    8671
+ |_               Cancel                                  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ Probes                                                   6474    10 K    10 K    7887    26 K    53 K    47 K    65 K    7326    5207    15 K    14 K    7556    6098    8057    14 K
+ |-               Target
+ |                |-                 Directed Probe       4416    7720    7880    5694    21 K    44 K    35 K    48 K    5960    3526    13 K    12 K    6232    4854    6326    12 K
+ |                |_                 Multicast Probe      2056    2690    2156    2185    5486    9650    11 K    16 K    1351    1639    1932    1153    1320    1232    1650    1532
+ |-               Hop
+ |                |-                 Response To Target   12      50      4       55      28      28      4       108     4       4       2       3       3       2       0       4
+ |                |_                 Response To Source   6549    10 K    10 K    7951    26 K    54 K    47 K    65 K    7324    5264    15 K    14 K    7552    6102    8167    14 K
+ |-               Type
+ |                |-                 Probe Nop            0       0       0       1       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Share          1       3       2       0       11      9       3       98      4       4       2       3       3       2       0       4
+ |                |-                 Probe Fetch          0       0       0       0       20      16      10      57      5       0       0       0       0       0       0       0
+ |                |-                 Probe Clean          0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Migrate        5964    4574    6206    2839    21 K    35 K    36 K    41 K    4604    3170    9488    7228    4251    3810    4408    7560
+ |                |-                 Probe IC Invalidate  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Probe Invalidate     4033    2649    3936    1718    12 K    20 K    13 K    25 K    3280    1874    7414    6002    3378    2916    3103    6290
+ |                |_                 Probe Steer          0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |-               Probe Store
+ |                |-                 By Wrsized           0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 By Vicblk            0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Reject Wrsized       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 Reject Vicblk        0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |-                 RdBlk Hit Wrsized    0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |                |_                 RdBlk Hit VicBlk     0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |_               Cancel                                  0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ |_               Early                                   0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0
+ Response
+ |-               Target Start                            27      2       0       0       5       0       0       0       0       0       0       0       0       0       0       0
+ |_               Target Done                             179 K   185 K   178 K   197 K   250 K   261 K   243 K   273 K   205 K   225 K   209 K   233 K   180 K   195 K   182 K   206 K
+ |                |-                 With Data            110 K   133 K   123 K   129 K   151 K   178 K   156 K   176 K   134 K   161 K   141 K   161 K   115 K   138 K   122 K   140 K
+ |                |_                 Without Data         69 K    52 K    55 K    68 K    98 K    82 K    86 K    96 K    71 K    63 K    68 K    71 K    65 K    57 K    59 K    66 K

@@ -1,0 +1,14 @@
+ Non-CACHE-MEM :requests received from IO(local and remote)/CPU(not through cache) to memory
+  NON-CACHE-MEM->      CS0_RDSZ          CS1_RDSZ          CS2_RDSZ          CS3_RDSZ          CS0_WRSZ          CS1_WRSZ          CS2_WRSZ          CS3_WRSZ        TOTAL_BW_MIN      TOTAL_BW_MAX
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+       DIE0               48                49                50                50                 2                 2                 3                 2             6714  B/s          13 KB/s
+       DIE1                0                 0                 0                 0                 0                 0                 0                 0              76  B/s          153  B/s
+       DIE2               29                28                29                34                 0                 0                 0                 0             3935  B/s         7870  B/s
+       DIE3               14                15                14                15                 0                 0                 0                 0             1904  B/s         3808  B/s
+       DIE4               118               129               131               111               13                13                35                13              18 KB/s           36 KB/s
+       DIE5              15 K              15 K              15 K              15 K                0                 0                 0                 0             2010 KB/s         4020 KB/s
+       DIE6                1                 2                 2                 1                 0                 0                 0                 0             246  B/s          493  B/s
+       DIE7               14                 8                 8                 8                 0                 0                 0                 0             1315  B/s         2631  B/s
+       SKT0               92                93                95                100                2                 3                 3                 2              12 KB/s           25 KB/s
+       SKT1              15 K              15 K              15 K              15 K               13                13                35                13             2029 KB/s         4059 KB/s
+        SYS              15 K              15 K              15 K              15 K               16                16                38                16             2042 KB/s         4084 KB/s

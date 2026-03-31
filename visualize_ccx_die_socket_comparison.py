@@ -1,0 +1,1725 @@
+#!/usr/bin/env python3
+"""
+Comprehensive Visualization for CCX vs DIE vs SOCKET comparison.
+Matches the comparison logic in compare_ccx_die_socket.py with Level 3 metrics.
+"""
+
+import json
+import os
+import subprocess
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
+
+# Configuration
+DATA_DIR = "data/liuxiu"
+DATASETS = ["ccx", "die", "socket"]
+DATASET_COLORS = {"ccx": "#1f77b4", "die": "#ff7f0e", "socket": "#2ca02c"}
+DATASET_LABELS = {"ccx": "CCX", "die": "DIE", "socket": "SOCKET"}
+OUTPUT_DIR = "results/visualizations/ccx_die_socket_comparison"
+PARSERS_DIR = "parsers"
+
+
+def parse_value(value_str):
+    """Parse values with K/M/G suffixes."""
+    if isinstance(value_str, (int, float)):
+        return float(value_str)
+
+    value_str = str(value_str).strip()
+    if not value_str or value_str == "0":
+        return 0.0
+
+    # Handle percentages
+    if '%' in value_str:
+        try:
+            return float(value_str.replace('%', '').strip())
+        except:
+            return 0.0
+
+    # Handle K, M, G suffixes
+    multipliers = {'K': 1e3, 'M': 1e6, 'G': 1e9, 'T': 1e12}
+
+    for suffix, mult in multipliers.items():
+        if value_str.endswith(suffix):
+            try:
+                return float(value_str[:-1].strip()) * mult
+            except:
+                pass
+
+    # Handle "N suffix" format (e.g., "1.5 M")
+    parts = value_str.split()
+    if len(parts) == 2:
+        try:
+            number = float(parts[0])
+            suffix = parts[1]
+            return number * multipliers.get(suffix, 1)
+        except:
+            pass
+
+    try:
+        return float(value_str.replace(',', ''))
+    except:
+        return 0.0
+
+
+def run_parser(parser_name, filepath):
+    """Run a parser and return parsed JSON data."""
+    parser_path = os.path.join(PARSERS_DIR, parser_name)
+    if not os.path.exists(filepath):
+        return None
+
+    try:
+        result = subprocess.run(
+            ["python3", parser_path, filepath],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+    except Exception as e:
+        print(f"Error running parser: {e}")
+    return None
+
+
+def fmt(val, unit=""):
+    """Format large numbers with K/M/G suffix."""
+    if val == 0:
+        return "0"
+    elif val >= 1e9:
+        return f"{val/1e9:.1f}G{unit}"
+    elif val >= 1e6:
+        return f"{val/1e6:.1f}M{unit}"
+    elif val >= 1e3:
+        return f"{val/1e3:.1f}K{unit}"
+    else:
+        return f"{val:.0f}{unit}"
+
+
+def extract_metric_values(parsed_data, metric_name, die_index=2):
+    """Extract metric values from df_data_stream parsed data."""
+    if not parsed_data or "sections" not in parsed_data:
+        return 0
+
+    sections = parsed_data.get("sections", [])
+    if not sections:
+        return 0
+
+    num_sections = len(sections)
+    if num_sections == 1:
+        target_section_idx = 0
+        local_die_index = die_index
+    else:
+        target_section_idx = None
+        local_die_index = die_index
+        for i, section in enumerate(sections):
+            die_labels = section.get("die_labels", [])
+            die_name = f"DIE{die_index}"
+            if die_name in die_labels:
+                target_section_idx = i
+                local_die_index = die_labels.index(die_name)
+                break
+        if target_section_idx is None:
+            return 0
+
+    section = sections[target_section_idx]
+
+    # Search in level1_categories
+    for cat in section.get("level1_categories", []):
+        if cat.get("name") == metric_name:
+            values = cat.get("values", [])
+            if values and local_die_index * 4 < len(values):
+                total = sum(parse_value(values[local_die_index * 4 + i]) for i in range(min(4, len(values) - local_die_index * 4)))
+                return total
+
+        # Search in level2_metrics
+        for l2 in cat.get("level2_metrics", []):
+            if l2.get("name") == metric_name:
+                values = l2.get("values", [])
+                if values and local_die_index * 4 < len(values):
+                    total = sum(parse_value(values[local_die_index * 4 + i]) for i in range(min(4, len(values) - local_die_index * 4)))
+                    return total
+
+            # Search in level3_metrics
+            for l3 in l2.get("level3_metrics", []):
+                if l3.get("name") == metric_name:
+                    values = l3.get("values", [])
+                    if values and local_die_index * 4 < len(values):
+                        total = sum(parse_value(values[local_die_index * 4 + i]) for i in range(min(4, len(values) - local_die_index * 4)))
+                        return total
+
+    return 0
+
+
+def extract_detail_lat_metric(parsed_data, tx_type, metric_l2, metric_l3=None, die_index=2):
+    """Extract metric from df_detail_lat parsed data."""
+    if not parsed_data or "sections" not in parsed_data:
+        return 0
+
+    sections = parsed_data.get("sections", [])
+    section_index = die_index // 4
+    local_die_index = die_index % 4
+
+    if section_index >= len(sections):
+        return 0
+
+    section = sections[section_index]
+
+    for tx in section.get("transaction_types", []):
+        if tx.get("name") == tx_type:
+            for l2 in tx.get("level2_metrics", []):
+                if l2.get("name") == metric_l2:
+                    if metric_l3:
+                        for l3 in l2.get("level3_metrics", []):
+                            if l3.get("name") == metric_l3:
+                                values = l3.get("values", [])
+                                if values and local_die_index * 4 < len(values):
+                                    total = sum(parse_value(values[local_die_index * 4 + i]) for i in range(min(4, len(values) - local_die_index * 4)))
+                                    return total
+                    else:
+                        values = l2.get("values", [])
+                        if values and local_die_index * 4 < len(values):
+                            total = sum(parse_value(values[local_die_index * 4 + i]) for i in range(min(4, len(values) - local_die_index * 4)))
+                            return total
+    return 0
+
+
+def extract_queue_metric(parsed_data, queue_type, metric_l2, metric_l3=None, section_index=0):
+    """Extract metric from df_queue parsed data."""
+    if not parsed_data or "sections" not in parsed_data:
+        return []
+
+    sections = parsed_data.get("sections", [])
+    if section_index >= len(sections):
+        return []
+
+    section = sections[section_index]
+
+    for qt in section.get("queue_types", []):
+        if qt.get("name") == queue_type:
+            for l2 in qt.get("level2_metrics", []):
+                if l2.get("name") == metric_l2:
+                    if metric_l3:
+                        for l3 in l2.get("level3_metrics", []):
+                            if l3.get("name") == metric_l3:
+                                return l3.get("values", [])
+                    else:
+                        return l2.get("values", [])
+    return []
+
+
+def visualize_cm_data():
+    """Visualize Core-to-Memory Bandwidth comparison for all DIEs."""
+    print("  Creating CM_DATA visualization...")
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig.suptitle('Core-to-Memory Bandwidth Comparison (All DIEs)', fontsize=14, fontweight='bold')
+
+    # Load data using correct parser
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/cm_data"
+        if os.path.exists(filepath):
+            parsed = run_parser("cm_data_parser.py", filepath)
+            data[ds] = parsed
+
+    dies = [f"DIE{i}" for i in range(8)]
+    x = np.arange(len(dies))
+    width = 0.25
+
+    # Chart 1: CS Read Total (sum of CS0_RD through CS3_RD)
+    ax = axes[0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for die in dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == die:
+                    # Sum all CS read columns
+                    val = sum(parse_value(entry.get(f"CS{j}_RD", 0)) for j in range(4))
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('DIE', fontsize=11)
+    ax.set_ylabel('Value (Millions)', fontsize=11)
+    ax.set_title('CS Read Total (CS0-CS3)', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # Chart 2: Total Bandwidth
+    ax = axes[1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for die in dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == die:
+                    bw_str = entry.get("TOTAL_BW", "0")
+                    # Parse bandwidth (e.g., "90 MB/s", "19 GB/s")
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('DIE', fontsize=11)
+    ax.set_ylabel('Bandwidth (MB/s)', fontsize=11)
+    ax.set_title('Total Bandwidth', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, 'cm_data_all_dies.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: cm_data_all_dies.png")
+
+
+def visualize_di_data():
+    """Visualize DI_DATA (Data Interchange between sockets)."""
+    print("  Creating DI_DATA visualization...")
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('DI_DATA: Data Translation Between Sockets', fontsize=14, fontweight='bold')
+
+    # Load data
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/di_data"
+        if os.path.exists(filepath):
+            data[ds] = run_parser("di_data_parser.py", filepath)
+
+    io_dies = ["IO DIE0", "IO DIE1", "IO DIE2"]
+    x = np.arange(len(io_dies))
+    width = 0.25
+
+    # Chart 1: Socket0 transfers
+    ax = axes[0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for io_die in io_dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == "Socket0":
+                    bw_str = entry.get(io_die, "0")
+                    # Parse bandwidth (e.g., "141 MB/s", "0 B/s")
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    elif "KB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("KB/s", "").strip()) * 1e3
+                    elif "B/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("B/s", "").strip())
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('IO DIE', fontsize=11)
+    ax.set_ylabel('Transfer Rate (MB/s)', fontsize=11)
+    ax.set_title('Socket0 → IO DIEs', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(io_dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # Chart 2: Socket1 transfers
+    ax = axes[1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+
+        values = []
+        for io_die in io_dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == "Socket1":
+                    bw_str = entry.get(io_die, "0")
+                    # Parse bandwidth
+                    if "GB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("GB/s", "").strip()) * 1e9
+                    elif "MB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("MB/s", "").strip()) * 1e6
+                    elif "KB/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("KB/s", "").strip()) * 1e3
+                    elif "B/s" in str(bw_str):
+                        val = parse_value(bw_str.replace("B/s", "").strip())
+                    else:
+                        val = parse_value(bw_str)
+                    break
+            values.append(val)
+
+        ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_xlabel('IO DIE', fontsize=11)
+    ax.set_ylabel('Transfer Rate (MB/s)', fontsize=11)
+    ax.set_title('Socket1 → IO DIEs', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(io_dies)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, 'di_data_socket_transfers.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: di_data_socket_transfers.png")
+
+
+def visualize_df_data_stream():
+    """Visualize DF_DATA_STREAM with Level 3 metrics."""
+    print("  Creating DF_DATA_STREAM visualizations...")
+
+    output_subdir = os.path.join(OUTPUT_DIR, 'df_data_stream')
+    os.makedirs(output_subdir, exist_ok=True)
+
+    # Parse data for each dataset
+    files_metrics = {
+        "ccm_in_data": ["Data Transfer", "No Data Transfer", "State/PassD", "Inv_NoPassD", "Inv_PassD", "Shr_NoPassD", "Shr_PassD", "PrbSrc", "PrbTgt"],
+        "cs_in_data": [
+            # Request (Level 1)
+            "ChgToX", "VicBlk", "VicBlkFull", "VicBlkCln", "RdBlk", "RdBlkL", "RdBlkX", "RdBlkC",
+            # Response (Level 1)
+            "SrcDn", "Probe Response", "Single", "Multiple", "With Data", "MemFetch"
+        ],
+        "cs_out_data": [
+            # Requests to UMC (Level 1)
+            "Requests to UMC", "RdBlkS", "RdSizedNC", "WrSizedNC",
+            # Probes (Level 1)
+            "Probes", "Directed Probe", "Multicast Probe",
+            # Response (Level 1)
+            "Target Done", "With Data", "Without Data"
+        ],
+        "spf_in_data": [
+            # Level 1 metrics
+            "RdSized", "RdBlkC", "RdBlkL", "RdBlkX", "ChgToX", "VicBlkFull"
+        ],
+        "spf_out_data": [
+            # Target (Level 1)
+            "Target", "None", "Directed", "Multicast",
+            # Status (Level 1)
+            "Miss", "Hit",
+            # State (Level 1)
+            "State I", "State F", "State X"
+        ],
+    }
+
+    for fname, metrics in files_metrics.items():
+        parsed = {}
+        for ds in DATASETS:
+            filepath = f"{DATA_DIR}/{ds}/df_data_stream/{fname}"
+            parsed[ds] = run_parser("liuxiu_df_data_stream_parser.py", filepath)
+
+        # Create multi-row figure for this file
+        n_metrics = len(metrics)
+        n_cols = 3
+        n_rows = (n_metrics + n_cols - 1) // n_cols
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(18, 5 * n_rows))
+        fig.suptitle(f'{fname.upper()} - All DIEs Comparison (Including Level 3)', fontsize=14, fontweight='bold')
+        axes = axes.flatten() if n_rows > 1 else [axes] if n_cols == 1 else axes.flatten()
+
+        dies = [f"DIE{i}" for i in range(8)]
+        x = np.arange(len(dies))
+        width = 0.25
+
+        for idx, metric in enumerate(metrics):
+            if idx >= len(axes):
+                break
+            ax = axes[idx]
+
+            for i, ds in enumerate(DATASETS):
+                if ds not in parsed or not parsed[ds]:
+                    continue
+
+                values = [extract_metric_values(parsed[ds], metric, die_idx) for die_idx in range(8)]
+                ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+            ax.set_xlabel('DIE', fontsize=10)
+            ax.set_ylabel('Value (Millions)', fontsize=10)
+            ax.set_title(metric, fontsize=11)
+            ax.set_xticks(x)
+            ax.set_xticklabels(dies, fontsize=8)
+            ax.legend(fontsize=8)
+            ax.grid(axis='y', alpha=0.3)
+
+        # Hide empty subplots
+        for idx in range(len(metrics), len(axes)):
+            axes[idx].set_visible(False)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_subdir, f'{fname}_all_dies.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    Saved: {fname}_all_dies.png")
+
+
+def visualize_df_detail_lat():
+    """Visualize DF_DETAIL_LAT with all Level 1 transaction types and Level 3 latency histograms.
+
+    Structure:
+    - Level 1: TARGET_CORE_DIE:2
+    - Transaction Types: RDBLK, RDSIZED, RDSIZEDNC, WRSIZED, WRSIZEDNC, DIRTY_VICTIM, CLEAN_VICITM, ATOMIC
+    - Level 2: Transaction, AVG LAT(ns), SDP Latency Histogram, FTI Latency Histogram
+    - Level 3: SDP, FTI, latency buckets
+    """
+    print("  Creating DF_DETAIL_LAT visualizations...")
+
+    output_subdir = os.path.join(OUTPUT_DIR, 'df_detail_lat')
+    os.makedirs(output_subdir, exist_ok=True)
+
+    # Parse data for CCM and IOM
+    parsed_ccm = {}
+    parsed_iom = {}
+    for ds in DATASETS:
+        ccm_path = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
+        iom_path = f"{DATA_DIR}/{ds}/df_detail_lat/iom2todie2_latency_data"
+        parsed_ccm[ds] = run_parser("liuxiu_df_detail_lat_parser.py", ccm_path)
+        parsed_iom[ds] = run_parser("liuxiu_df_detail_lat_parser.py", iom_path)
+
+    # All Level 1 transaction types
+    transaction_types = ["RDBLK", "RDSIZED", "RDSIZEDNC", "WRSIZED", "WRSIZEDNC",
+                         "DIRTY_VICTIM", "CLEAN_VICITM", "ATOMIC"]
+
+    dies = [f"DIE{i}" for i in range(8)]
+    x = np.arange(len(dies))
+    width = 0.25
+    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns",
+                       "200ns-500ns", "500ns-1000ns", ">1000ns"]
+
+    # ========== CCM2TODIE2_LATENCY_DATA ==========
+    # 1. Summary chart: All transaction types SDP counts (DIE2 focus)
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - SDP Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} SDP', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_sdp.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: ccm_all_tx_types_sdp.png")
+
+    # 2. All transaction types FTI counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - FTI Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "Transaction", "FTI", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} FTI', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_fti.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: ccm_all_tx_types_fti.png")
+
+    # 3. All transaction types AVG LAT
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('CCM2TODIE2: All Transaction Types - AVG LAT(ns) SDP (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_ccm or not parsed_ccm[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_ccm[ds], tx_type, "AVG LAT(ns)", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, values, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Latency (ns)', fontsize=9)
+        ax.set_title(f'{tx_type} AVG LAT', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_all_tx_types_avg_lat.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: ccm_all_tx_types_avg_lat.png")
+
+    # 4. Latency histograms for all transaction types (DIE2)
+    # Include all 8 transaction types: RDBLK, RDSIZED, RDSIZEDNC, WRSIZED, WRSIZEDNC, DIRTY_VICTIM, CLEAN_VICITM, ATOMIC
+    all_tx_types_for_histogram = transaction_types  # Use all 8 types
+    x_hist = np.arange(len(latency_buckets))
+
+    for tx_type in all_tx_types_for_histogram:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+        fig.suptitle(f'CCM2TODIE2: {tx_type} Latency Histogram (Level 3) - DIE2', fontsize=14, fontweight='bold')
+
+        for ax_idx, (histogram_type, title) in enumerate([("SDP Latency Histogram", "SDP"), ("FTI Latency Histogram", "FTI")]):
+            ax = axes[ax_idx]
+
+            for i, ds in enumerate(DATASETS):
+                if ds not in parsed_ccm or not parsed_ccm[ds]:
+                    continue
+
+                values = []
+                for bucket in latency_buckets:
+                    val = extract_detail_lat_metric(parsed_ccm[ds], tx_type, histogram_type, bucket, die_index=2)
+                    values.append(val if isinstance(val, (int, float)) else 0)
+
+                ax.bar(x_hist + (i - 1) * width, values, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+            ax.set_xlabel('Latency Bucket', fontsize=11)
+            ax.set_ylabel('Percentage (%)', fontsize=11)
+            ax.set_title(f'{title} Latency Histogram', fontsize=12)
+            ax.set_xticks(x_hist)
+            ax.set_xticklabels(latency_buckets, rotation=45, ha='right', fontsize=9)
+            ax.legend()
+            ax.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_subdir, f'ccm_{tx_type.lower()}_histogram_die2.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    Saved: ccm_{tx_type.lower()}_histogram_die2.png")
+
+    # ========== IOM2TODIE2_LATENCY_DATA ==========
+    # 5. IOM Summary chart: All transaction types SDP counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('IOM2TODIE2: All Transaction Types - SDP Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_iom or not parsed_iom[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "SDP", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} SDP', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_all_tx_types_sdp.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: iom_all_tx_types_sdp.png")
+
+    # 6. IOM All transaction types FTI counts
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('IOM2TODIE2: All Transaction Types - FTI Transaction Counts (All DIEs)', fontsize=14, fontweight='bold')
+    axes = axes.flatten()
+
+    for idx, tx_type in enumerate(transaction_types):
+        ax = axes[idx]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in parsed_iom or not parsed_iom[ds]:
+                continue
+
+            values = [extract_detail_lat_metric(parsed_iom[ds], tx_type, "Transaction", "FTI", die_idx) for die_idx in range(8)]
+            ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('DIE', fontsize=9)
+        ax.set_ylabel('Millions', fontsize=9)
+        ax.set_title(f'{tx_type} FTI', fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(dies, fontsize=7)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_all_tx_types_fti.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: iom_all_tx_types_fti.png")
+
+
+def visualize_df_queue():
+    """Visualize DF_QUEUE with Level 3 metrics for CCM, CS, and IOM queues."""
+    print("  Creating DF_QUEUE visualizations...")
+
+    output_subdir = os.path.join(OUTPUT_DIR, 'df_queue')
+    os.makedirs(output_subdir, exist_ok=True)
+
+    section_labels = ["DIE0-1", "DIE2-3", "DIE4-5", "DIE6-7"]
+    x = np.arange(len(section_labels))
+    width = 0.25
+    occupancy_buckets = ["0%-25%", "25%-50%", "50%-75%", "75%-100%"]
+
+    # ========== CCM_QUEUE_DATA ==========
+    print("    Creating CCM_QUEUE visualizations...")
+    ccm_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
+        ccm_parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
+
+    # 1. CCM Queue Level 2 metrics by section
+    fig, axes = plt.subplots(4, 5, figsize=(25, 18))
+    fig.suptitle('CCM_QUEUE_DATA - Complete Level 2 Metrics', fontsize=14, fontweight='bold')
+
+    ccm_queue_metrics = [
+        # REQQ
+        ("REQQ", "Request", None, "REQQ Request", "count"),
+        ("REQQ", "Bypass Rate", None, "REQQ Bypass Rate", "pct"),
+        ("REQQ", "Pick Rate", None, "REQQ Pick Rate", "pct"),
+        ("REQQ", "Kill Rate", None, "REQQ Kill Rate", "pct"),
+        # ORIGDQ
+        ("ORIGDQ", "write", None, "ORIGDQ Write", "count"),
+        ("ORIGDQ", "PrbRsp", None, "ORIGDQ PrbRsp", "count"),
+        # PRBQ
+        ("PRBQ", "Probe", None, "PRBQ Probe", "count"),
+        ("PRBQ", "Req Bypass Rate", None, "PRBQ Req Bypass Rate", "pct"),
+        ("PRBQ", "Req Pick Rate", None, "PRBQ Req Pick Rate", "pct"),
+        ("PRBQ", "Rsp Pick Rate", None, "PRBQ Rsp Pick Rate", "pct"),
+        ("PRBQ", "Rsp kill Rate", None, "PRBQ Rsp Kill Rate", "pct"),
+        # RSPQ
+        ("RSPQ", "Response", None, "RSPQ Response", "count"),
+        ("RSPQ", "Pick Rate", None, "RSPQ Pick Rate", "pct"),
+        ("RSPQ", "RdRsp Kill Rate", None, "RSPQ RdRsp Kill Rate", "pct"),
+        ("RSPQ", "WrRsp kill Rate", None, "RSPQ WrRsp Kill Rate", "pct"),
+        ("RSPQ", "SrcDn kill Rate", None, "RSPQ SrcDn Kill Rate", "pct"),
+        # RSPDQ
+        ("RSPDQ", "Response", None, "RSPDQ Response", "count"),
+        ("RSPDQ", "Command Bypass Rate", None, "RSPDQ Cmd Bypass Rate", "pct"),
+        ("RSPDQ", "Data Bypass Rate", None, "RSPDQ Data Bypass Rate", "pct"),
+        ("RSPDQ", "Pick Rate", None, "RSPDQ Pick Rate", "pct"),
+    ]
+
+    for idx, (queue, l2, l3, title, mtype) in enumerate(ccm_queue_metrics):
+        ax = axes[idx // 5, idx % 5]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in ccm_parsed or not ccm_parsed[ds]:
+                continue
+
+            values = []
+            for section_idx in range(4):
+                vals = extract_queue_metric(ccm_parsed[ds], queue, l2, l3, section_index=section_idx)
+                if mtype == "pct":
+                    pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+                    avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                    values.append(avg)
+                else:
+                    total = sum(parse_value(v) for v in vals)
+                    values.append(total)
+
+            if mtype == "pct":
+                ax.bar(x + (i - 1) * width, values, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+            else:
+                ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('Section', fontsize=9)
+        ax.set_ylabel('%' if mtype == "pct" else 'Millions', fontsize=9)
+        ax.set_title(title, fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(section_labels, fontsize=8)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_queue_all_metrics.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: ccm_queue_all_metrics.png")
+
+    # 2. CCM Queue Level 3: OCCUPANCY for all queue types
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle('CCM_QUEUE Level 3: OCCUPANCY Buckets (DIE2-3 Section)', fontsize=14, fontweight='bold')
+
+    queue_types = ["REQQ", "ORIGDQ", "PRBQ", "RSPQ", "RSPDQ"]
+    x_occ = np.arange(len(occupancy_buckets))
+
+    for ax_idx, queue in enumerate(queue_types):
+        ax = axes[ax_idx // 3, ax_idx % 3]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in ccm_parsed or not ccm_parsed[ds]:
+                continue
+
+            values = []
+            for bucket in occupancy_buckets:
+                vals = extract_queue_metric(ccm_parsed[ds], queue, "OCCUPANCY", bucket, section_index=1)
+                pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+                avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                values.append(avg)
+
+            ax.bar(x_occ + (i - 1) * width, values, width,
+                   label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('Bucket', fontsize=11)
+        ax.set_ylabel('Percentage (%)', fontsize=11)
+        ax.set_title(f'{queue} OCCUPANCY', fontsize=12)
+        ax.set_xticks(x_occ)
+        ax.set_xticklabels(occupancy_buckets)
+        ax.legend()
+        ax.grid(axis='y', alpha=0.3)
+
+    # Hide unused subplot
+    axes[1, 2].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_queue_occupancy_level3.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: ccm_queue_occupancy_level3.png")
+
+    # 3. CCM Queue Level 3: Kill Rate breakdown
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('CCM_QUEUE Level 3: Kill Rate Breakdown (DIE2-3 Section)', fontsize=14, fontweight='bold')
+
+    # REQQ Kill Rate breakdown
+    ax = axes[0, 0]
+    kill_reasons = ["Command Token Unavail", "Data Token Unavail", "RSPQ Unavail", "RSPD Unavail"]
+    x_kill = np.arange(len(kill_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_parsed or not ccm_parsed[ds]:
+            continue
+        values = []
+        for reason in kill_reasons:
+            vals = extract_queue_metric(ccm_parsed[ds], "REQQ", "Kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_kill + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('REQQ Kill Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason', fontsize=11)
+    ax.set_ylabel('Percentage (%)', fontsize=11)
+    ax.set_xticks(x_kill)
+    ax.set_xticklabels([r[:15] for r in kill_reasons], rotation=30, ha='right', fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # PRBQ Rsp kill Rate breakdown
+    ax = axes[0, 1]
+    prbq_reasons = ["Command Buffer Unavail", "Data Buffer Unavail"]
+    x_prbq = np.arange(len(prbq_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_parsed or not ccm_parsed[ds]:
+            continue
+        values = []
+        for reason in prbq_reasons:
+            vals = extract_queue_metric(ccm_parsed[ds], "PRBQ", "Rsp kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_prbq + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('PRBQ Rsp Kill Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason', fontsize=11)
+    ax.set_ylabel('Percentage (%)', fontsize=11)
+    ax.set_xticks(x_prbq)
+    ax.set_xticklabels(prbq_reasons, fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # RSPQ RdRsp Kill Rate breakdown
+    ax = axes[1, 0]
+    rdrsp_reasons = ["SDP BUffer Unavail", "ReXmt", "Bypass Collision"]
+    x_rdrsp = np.arange(len(rdrsp_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_parsed or not ccm_parsed[ds]:
+            continue
+        values = []
+        for reason in rdrsp_reasons:
+            vals = extract_queue_metric(ccm_parsed[ds], "RSPQ", "RdRsp Kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_rdrsp + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('RSPQ RdRsp Kill Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason', fontsize=11)
+    ax.set_ylabel('Percentage (%)', fontsize=11)
+    ax.set_xticks(x_rdrsp)
+    ax.set_xticklabels(rdrsp_reasons, fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # RSPQ SrcDn kill Rate breakdown
+    ax = axes[1, 1]
+    srcdn_reasons = ["Ordering Fail", "Buffer Unavail"]
+    x_srcdn = np.arange(len(srcdn_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_parsed or not ccm_parsed[ds]:
+            continue
+        values = []
+        for reason in srcdn_reasons:
+            vals = extract_queue_metric(ccm_parsed[ds], "RSPQ", "SrcDn kill Rate", reason, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_srcdn + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('RSPQ SrcDn Kill Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason', fontsize=11)
+    ax.set_ylabel('Percentage (%)', fontsize=11)
+    ax.set_xticks(x_srcdn)
+    ax.set_xticklabels(srcdn_reasons, fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'ccm_queue_kill_rate_level3.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: ccm_queue_kill_rate_level3.png")
+
+    # ========== CS_QUEUE_DATA ==========
+    print("    Creating CS_QUEUE visualizations...")
+    cs_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/cs_queue_data"
+        cs_parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
+
+    # CS Queue Level 2 metrics
+    fig, axes = plt.subplots(3, 6, figsize=(30, 15))
+    fig.suptitle('CS_QUEUE_DATA - Complete Level 2 Metrics', fontsize=14, fontweight='bold')
+
+    cs_queue_metrics = [
+        # CSQ
+        ("CSQ", "Allocation", None, "CSQ Allocation", "count"),
+        ("CSQ", "Req Bypass Rate", None, "CSQ Req Bypass Rate", "pct"),
+        ("CSQ", "Req Pick Rate", None, "CSQ Req Pick Rate", "pct"),
+        ("CSQ", "Prb Pick Rate", None, "CSQ Prb Pick Rate", "pct"),
+        ("CSQ", "Rsp Bypass Rate", None, "CSQ Rsp Bypass Rate", "pct"),
+        ("CSQ", "Rsp Pick Rate", None, "CSQ Rsp Pick Rate", "pct"),
+        # PFQ
+        ("PFQ", "Probe", None, "PFQ Probe", "count"),
+        ("PFQ", "DRQ Bank Busy", None, "PFQ DRQ Bank Busy", "pct"),
+        ("PFQ", "Index Match", None, "PFQ Index Match", "pct"),
+        ("PFQ", "Error Rate", None, "PFQ Error Rate", "pct"),
+        ("PFQ", "Downgrade Rate", None, "PFQ Downgrade Rate", "pct"),
+        # Combine
+        ("Combine", "RdBlkL", None, "Combine RdBlkL", "count"),
+        ("Combine", "RCB Hit Rate", None, "Combine RCB Hit Rate", "pct"),
+        ("Combine", "RCB Close", None, "Combine RCB Close", "count"),
+        ("Combine", "WrSized", None, "Combine WrSized", "count"),
+        ("Combine", "WCB Hit Rate", None, "Combine WCB Hit Rate", "pct"),
+        ("Combine", "WCB Close", None, "Combine WCB Close", "count"),
+    ]
+
+    for idx, (queue, l2, l3, title, mtype) in enumerate(cs_queue_metrics):
+        if idx >= 18:
+            break
+        ax = axes[idx // 6, idx % 6]
+
+        for i, ds in enumerate(DATASETS):
+            if ds not in cs_parsed or not cs_parsed[ds]:
+                continue
+
+            values = []
+            for section_idx in range(4):
+                vals = extract_queue_metric(cs_parsed[ds], queue, l2, l3, section_index=section_idx)
+                if mtype == "pct":
+                    pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+                    avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                    values.append(avg)
+                else:
+                    total = sum(parse_value(v) for v in vals)
+                    values.append(total)
+
+            if mtype == "pct":
+                ax.bar(x + (i - 1) * width, values, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+            else:
+                ax.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+                       label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+        ax.set_xlabel('Section', fontsize=9)
+        ax.set_ylabel('%' if mtype == "pct" else 'Millions', fontsize=9)
+        ax.set_title(title, fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(section_labels, fontsize=8)
+        ax.legend(fontsize=7)
+        ax.grid(axis='y', alpha=0.3)
+
+    # Hide unused subplot
+    axes[2, 5].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'cs_queue_all_metrics.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: cs_queue_all_metrics.png")
+
+    # CS Queue Level 3 metrics
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle('CS_QUEUE Level 3 Metrics (DIE0-1 Section)', fontsize=14, fontweight='bold')
+
+    # CSQ OCCUPANCY
+    ax = axes[0, 0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(cs_parsed[ds], "CSQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('CSQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # PFQ OCCUPANCY
+    ax = axes[0, 1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(cs_parsed[ds], "PFQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('PFQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # CSQ Wait Condition
+    ax = axes[0, 2]
+    wait_conditions = ["Address Match", "Tag Match", "Large Read Match", "Data Forward"]
+    x_wait = np.arange(len(wait_conditions))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for cond in wait_conditions:
+            vals = extract_queue_metric(cs_parsed[ds], "CSQ", "Wait Condition", cond, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_wait + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('CSQ Wait Condition', fontsize=12)
+    ax.set_xlabel('Condition')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_wait)
+    ax.set_xticklabels([c[:12] for c in wait_conditions], rotation=30, ha='right', fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # PFQ Downgrade Rate breakdown
+    ax = axes[1, 0]
+    downgrade_reasons = ["CSQ Token", "Pool Token", "No Token Stall", "CS1 Stall"]
+    x_down = np.arange(len(downgrade_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for reason in downgrade_reasons:
+            vals = extract_queue_metric(cs_parsed[ds], "PFQ", "Downgrade Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_down + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('PFQ Downgrade Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_down)
+    ax.set_xticklabels(downgrade_reasons, fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # Combine RCB Close breakdown
+    ax = axes[1, 1]
+    rcb_reasons = ["Non-Combinable Operation", "CSD de-allocation"]
+    x_rcb = np.arange(len(rcb_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for reason in rcb_reasons:
+            vals = extract_queue_metric(cs_parsed[ds], "Combine", "RCB Close", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_rcb + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('Combine RCB Close Breakdown', fontsize=12)
+    ax.set_xlabel('Reason')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_rcb)
+    ax.set_xticklabels([r[:18] for r in rcb_reasons], fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # Combine WCB Close breakdown
+    ax = axes[1, 2]
+    wcb_reasons = ["Non-Combinable Operation", "Parent DRAM Write Issue", "Hit Threhold"]
+    x_wcb = np.arange(len(wcb_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_parsed or not cs_parsed[ds]:
+            continue
+        values = []
+        for reason in wcb_reasons:
+            vals = extract_queue_metric(cs_parsed[ds], "Combine", "WCB Close", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_wcb + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('Combine WCB Close Breakdown', fontsize=12)
+    ax.set_xlabel('Reason')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_wcb)
+    ax.set_xticklabels([r[:15] for r in wcb_reasons], rotation=30, ha='right', fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'cs_queue_level3.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: cs_queue_level3.png")
+
+    # ========== IOM_QUEUE_DATA ==========
+    print("    Creating IOM_QUEUE visualizations...")
+    iom_parsed = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/iom_queue_data"
+        iom_parsed[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
+
+    # IOM Queue Level 2 metrics
+    fig, axes = plt.subplots(2, 6, figsize=(30, 10))
+    fig.suptitle('IOM_QUEUE_DATA - Complete Level 2 Metrics (First IOD Group)', fontsize=14, fontweight='bold')
+
+    iom_queue_metrics = [
+        # REQQ
+        ("REQQ", "Request", None, "REQQ Request", "count"),
+        ("REQQ", "Request Size Ratio", None, "REQQ Request Size Ratio", "pct"),
+        ("REQQ", "Pick Rate", None, "REQQ Pick Rate", "pct"),
+        # REQDQ
+        ("REQDQ", "Data", None, "REQDQ Data", "count"),
+        ("REQDQ", "Data Size Ratio", None, "REQDQ Data Size Ratio", "pct"),
+        ("REQDQ", "IO Ratio", None, "REQDQ IO Ratio", "pct"),
+        # RSPQ
+        ("RSPQ", "DF Rsp", None, "RSPQ DF Rsp", "count"),
+        ("RSPQ", "DF Rsp Pick Rate", None, "RSPQ DF Rsp Pick Rate", "pct"),
+        ("RSPQ", "WR Rsp", None, "RSPQ WR Rsp", "count"),
+        ("RSPQ", "WR Rsp Pick Rate", None, "RSPQ WR Rsp Pick Rate", "pct"),
+        ("RSPQ", "RD Rsp", None, "RSPQ RD Rsp", "count"),
+        ("RSPQ", "RD Rsp Pick Rate", None, "RSPQ RD Rsp Pick Rate", "pct"),
+    ]
+
+    ds_labels = DATASETS
+    x_ds = np.arange(len(ds_labels))
+
+    for idx, (queue, l2, l3, title, mtype) in enumerate(iom_queue_metrics):
+        ax = axes[idx // 6, idx % 6]
+
+        values = []
+        for ds in DATASETS:
+            if ds not in iom_parsed or not iom_parsed[ds]:
+                values.append(0)
+                continue
+            vals = extract_queue_metric(iom_parsed[ds], queue, l2, l3, section_index=0)
+            if mtype == "pct":
+                pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+                avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+                values.append(avg)
+            else:
+                total = sum(parse_value(v) for v in vals)
+                values.append(total)
+
+        colors = [DATASET_COLORS[ds] for ds in DATASETS]
+        if mtype == "pct":
+            ax.bar(x_ds, values, color=colors, alpha=0.8)
+        else:
+            ax.bar(x_ds, values, color=colors, alpha=0.8)
+
+        ax.set_xlabel('Dataset', fontsize=9)
+        ax.set_ylabel('%' if mtype == "pct" else 'Count', fontsize=9)
+        ax.set_title(title, fontsize=10)
+        ax.set_xticks(x_ds)
+        ax.set_xticklabels([DATASET_LABELS[ds] for ds in DATASETS], fontsize=9)
+        ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_queue_all_metrics.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: iom_queue_all_metrics.png")
+
+    # IOM Queue Level 3 metrics
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle('IOM_QUEUE Level 3 Metrics', fontsize=14, fontweight='bold')
+
+    # REQQ OCCUPANCY
+    ax = axes[0, 0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(iom_parsed[ds], "REQQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('REQQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # REQDQ OCCUPANCY
+    ax = axes[0, 1]
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(iom_parsed[ds], "REQDQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('REQDQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # RSPQ OCCUPANCY
+    ax = axes[0, 2]
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(iom_parsed[ds], "RSPQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('RSPQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # RSPDQ OCCUPANCY
+    ax = axes[1, 0]
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(iom_parsed[ds], "RSPDQ", "OCCUPANCY", bucket, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_occ + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('RSPDQ OCCUPANCY', fontsize=12)
+    ax.set_xlabel('Bucket')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_occ)
+    ax.set_xticklabels(occupancy_buckets)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # REQQ Request Breakdown
+    ax = axes[1, 1]
+    req_types = ["Normal Request", "IOS Response"]
+    x_req = np.arange(len(req_types))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for req_type in req_types:
+            vals = extract_queue_metric(iom_parsed[ds], "REQQ", "Request", req_type, section_index=0)
+            total = sum(parse_value(v) for v in vals)
+            values.append(total)
+        ax.bar(x_req + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('REQQ Request Breakdown', fontsize=12)
+    ax.set_xlabel('Type')
+    ax.set_ylabel('Count')
+    ax.set_xticks(x_req)
+    ax.set_xticklabels(req_types, fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    # REQQ Pick Rate breakdown
+    ax = axes[1, 2]
+    pick_reasons = ["Token Unavail or RSPQ Full", "Large Read Cancel"]
+    x_pick = np.arange(len(pick_reasons))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_parsed or not iom_parsed[ds]:
+            continue
+        values = []
+        for reason in pick_reasons:
+            vals = extract_queue_metric(iom_parsed[ds], "REQQ", "Pick Rate", reason, section_index=0)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax.bar(x_pick + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax.set_title('REQQ Pick Rate Breakdown', fontsize=12)
+    ax.set_xlabel('Reason')
+    ax.set_ylabel('Percentage (%)')
+    ax.set_xticks(x_pick)
+    ax.set_xticklabels([r[:18] for r in pick_reasons], rotation=30, ha='right', fontsize=9)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_subdir, 'iom_queue_level3.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("      Saved: iom_queue_level3.png")
+
+
+def create_summary_dashboard():
+    """Create a comprehensive summary dashboard."""
+    print("  Creating summary dashboard...")
+
+    fig = plt.figure(figsize=(24, 18))
+    fig.suptitle('CCX vs DIE vs SOCKET - Complete Comparison Summary', fontsize=18, fontweight='bold', y=0.98)
+
+    # Create grid
+    gs = fig.add_gridspec(3, 4, hspace=0.3, wspace=0.3)
+
+    # 1. CM_DATA Bandwidth
+    ax1 = fig.add_subplot(gs[0, 0])
+    data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/cm_data"
+        if os.path.exists(filepath):
+            data[ds] = run_parser("cm_data_parser.py", filepath)
+
+    dies = [f"DIE{i}" for i in range(8)]
+    x = np.arange(len(dies))
+    width = 0.25
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in data or not data[ds]:
+            continue
+        values = []
+        for die in dies:
+            val = 0
+            for entry in data[ds]:
+                if entry.get("Category") == die:
+                    # Sum all CS read columns
+                    val = sum(parse_value(entry.get(f"CS{j}_RD", 0)) for j in range(4))
+                    break
+            values.append(val)
+        ax1.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax1.set_title('CM_DATA: CS Read Total', fontsize=11)
+    ax1.set_xlabel('DIE')
+    ax1.set_ylabel('Millions')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(dies, fontsize=8)
+    ax1.legend(fontsize=8)
+    ax1.grid(axis='y', alpha=0.3)
+
+    # 2. IOM_DATA (Non-Cache Memory Requests)
+    ax2 = fig.add_subplot(gs[0, 1])
+    iom_data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/iom_data"
+        if os.path.exists(filepath):
+            iom_data[ds] = run_parser("iom_data_parser.py", filepath)
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in iom_data or not iom_data[ds]:
+            continue
+        values = []
+        for die in dies:
+            val = 0
+            for entry in iom_data[ds]:
+                if entry.get("Category") == die:
+                    # Sum all read size columns for total requests
+                    val = sum(parse_value(entry.get(f"CS{j}_RDSZ", 0)) for j in range(4))
+                    break
+            values.append(val)
+        ax2.bar(x + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax2.set_title('IOM_DATA: Total Read Requests', fontsize=11)
+    ax2.set_xlabel('DIE')
+    ax2.set_ylabel('Count')
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(dies, fontsize=8)
+    ax2.legend(fontsize=8)
+    ax2.grid(axis='y', alpha=0.3)
+
+    # 3. CCM_IN Data Transfer
+    ax3 = fig.add_subplot(gs[0, 2])
+    ccm_in = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_data_stream/ccm_in_data"
+        ccm_in[ds] = run_parser("liuxiu_df_data_stream_parser.py", filepath)
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_in or not ccm_in[ds]:
+            continue
+        values = [extract_metric_values(ccm_in[ds], "Data Transfer", die_idx) for die_idx in range(8)]
+        ax3.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax3.set_title('CCM_IN: Data Transfer', fontsize=11)
+    ax3.set_xlabel('DIE')
+    ax3.set_ylabel('Millions')
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(dies, fontsize=8)
+    ax3.legend(fontsize=8)
+    ax3.grid(axis='y', alpha=0.3)
+
+    # 4. CCM_IN Level 3: Inv_PassD
+    ax4 = fig.add_subplot(gs[0, 3])
+    for i, ds in enumerate(DATASETS):
+        if ds not in ccm_in or not ccm_in[ds]:
+            continue
+        values = [extract_metric_values(ccm_in[ds], "Inv_PassD", die_idx) for die_idx in range(8)]
+        ax4.bar(x + (i - 1) * width, np.array(values) / 1e3, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax4.set_title('CCM_IN Level 3: Inv_PassD', fontsize=11)
+    ax4.set_xlabel('DIE')
+    ax4.set_ylabel('Thousands')
+    ax4.set_xticks(x)
+    ax4.set_xticklabels(dies, fontsize=8)
+    ax4.legend(fontsize=8)
+    ax4.grid(axis='y', alpha=0.3)
+
+    # 5. CS_IN VicBlk
+    ax5 = fig.add_subplot(gs[1, 0])
+    cs_in = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_data_stream/cs_in_data"
+        cs_in[ds] = run_parser("liuxiu_df_data_stream_parser.py", filepath)
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_in or not cs_in[ds]:
+            continue
+        values = [extract_metric_values(cs_in[ds], "VicBlk", die_idx) for die_idx in range(8)]
+        ax5.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax5.set_title('CS_IN: VicBlk', fontsize=11)
+    ax5.set_xlabel('DIE')
+    ax5.set_ylabel('Millions')
+    ax5.set_xticks(x)
+    ax5.set_xticklabels(dies, fontsize=8)
+    ax5.legend(fontsize=8)
+    ax5.grid(axis='y', alpha=0.3)
+
+    # 6. CS_IN Level 3: VicBlkFull
+    ax6 = fig.add_subplot(gs[1, 1])
+    for i, ds in enumerate(DATASETS):
+        if ds not in cs_in or not cs_in[ds]:
+            continue
+        values = [extract_metric_values(cs_in[ds], "VicBlkFull", die_idx) for die_idx in range(8)]
+        ax6.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax6.set_title('CS_IN Level 3: VicBlkFull', fontsize=11)
+    ax6.set_xlabel('DIE')
+    ax6.set_ylabel('Millions')
+    ax6.set_xticks(x)
+    ax6.set_xticklabels(dies, fontsize=8)
+    ax6.legend(fontsize=8)
+    ax6.grid(axis='y', alpha=0.3)
+
+    # 7. DF_DETAIL_LAT RDBLK SDP
+    ax7 = fig.add_subplot(gs[1, 2])
+    detail_lat = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_detail_lat/ccm2todie2_latency_data"
+        detail_lat[ds] = run_parser("liuxiu_df_detail_lat_parser.py", filepath)
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in detail_lat or not detail_lat[ds]:
+            continue
+        values = [extract_detail_lat_metric(detail_lat[ds], "RDBLK", "Transaction", "SDP", die_idx) for die_idx in range(8)]
+        ax7.bar(x + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax7.set_title('DF_DETAIL_LAT: RDBLK SDP', fontsize=11)
+    ax7.set_xlabel('DIE')
+    ax7.set_ylabel('Millions')
+    ax7.set_xticks(x)
+    ax7.set_xticklabels(dies, fontsize=8)
+    ax7.legend(fontsize=8)
+    ax7.grid(axis='y', alpha=0.3)
+
+    # 8. Level 3: SDP Latency Histogram (DIE2)
+    ax8 = fig.add_subplot(gs[1, 3])
+    latency_buckets = ["0ns-50ns", "50ns-100ns", "100ns-150ns", "150ns-200ns", "200ns-500ns", "500ns-1000ns", ">1000ns"]
+    x_lat = np.arange(len(latency_buckets))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in detail_lat or not detail_lat[ds]:
+            continue
+        values = [extract_detail_lat_metric(detail_lat[ds], "RDBLK", "SDP Latency Histogram", bucket, die_index=2) for bucket in latency_buckets]
+        ax8.bar(x_lat + (i - 1) * width, values, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax8.set_title('Level 3: SDP Latency Histogram (DIE2)', fontsize=11)
+    ax8.set_xlabel('Bucket')
+    ax8.set_ylabel('Percentage (%)')
+    ax8.set_xticks(x_lat)
+    ax8.set_xticklabels([b[:7] for b in latency_buckets], rotation=45, ha='right', fontsize=7)
+    ax8.legend(fontsize=8)
+    ax8.grid(axis='y', alpha=0.3)
+
+    # 9. DF_QUEUE REQQ Request
+    ax9 = fig.add_subplot(gs[2, 0])
+    queue_data = {}
+    for ds in DATASETS:
+        filepath = f"{DATA_DIR}/{ds}/df_queue/ccm_queue_data"
+        queue_data[ds] = run_parser("liuxiu_df_queue_parser.py", filepath)
+
+    section_labels = ["DIE0-1", "DIE2-3", "DIE4-5", "DIE6-7"]
+    x_sec = np.arange(len(section_labels))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in queue_data or not queue_data[ds]:
+            continue
+        values = []
+        for section_idx in range(4):
+            vals = extract_queue_metric(queue_data[ds], "REQQ", "Request", None, section_index=section_idx)
+            total = sum(parse_value(v) for v in vals)
+            values.append(total)
+        ax9.bar(x_sec + (i - 1) * width, np.array(values) / 1e6, width,
+               label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax9.set_title('DF_QUEUE: REQQ Request', fontsize=11)
+    ax9.set_xlabel('Section')
+    ax9.set_ylabel('Millions')
+    ax9.set_xticks(x_sec)
+    ax9.set_xticklabels(section_labels)
+    ax9.legend(fontsize=8)
+    ax9.grid(axis='y', alpha=0.3)
+
+    # 10. Level 3: REQQ OCCUPANCY
+    ax10 = fig.add_subplot(gs[2, 1])
+    occupancy_buckets = ["0%-25%", "25%-50%", "50%-75%", "75%-100%"]
+    x_occ = np.arange(len(occupancy_buckets))
+
+    for i, ds in enumerate(DATASETS):
+        if ds not in queue_data or not queue_data[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(queue_data[ds], "REQQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax10.bar(x_occ + (i - 1) * width, values, width,
+                label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax10.set_title('Level 3: REQQ OCCUPANCY (DIE2-3)', fontsize=11)
+    ax10.set_xlabel('Bucket')
+    ax10.set_ylabel('Percentage (%)')
+    ax10.set_xticks(x_occ)
+    ax10.set_xticklabels(occupancy_buckets)
+    ax10.legend(fontsize=8)
+    ax10.grid(axis='y', alpha=0.3)
+
+    # 11. Level 3: RSPQ OCCUPANCY
+    ax11 = fig.add_subplot(gs[2, 2])
+    for i, ds in enumerate(DATASETS):
+        if ds not in queue_data or not queue_data[ds]:
+            continue
+        values = []
+        for bucket in occupancy_buckets:
+            vals = extract_queue_metric(queue_data[ds], "RSPQ", "OCCUPANCY", bucket, section_index=1)
+            pct_vals = [parse_value(v.replace('%', '')) for v in vals if '%' in str(v)]
+            avg = sum(pct_vals) / len(pct_vals) if pct_vals else 0
+            values.append(avg)
+        ax11.bar(x_occ + (i - 1) * width, values, width,
+                label=DATASET_LABELS[ds], color=DATASET_COLORS[ds], alpha=0.8)
+
+    ax11.set_title('Level 3: RSPQ OCCUPANCY (DIE2-3)', fontsize=11)
+    ax11.set_xlabel('Bucket')
+    ax11.set_ylabel('Percentage (%)')
+    ax11.set_xticks(x_occ)
+    ax11.set_xticklabels(occupancy_buckets)
+    ax11.legend(fontsize=8)
+    ax11.grid(axis='y', alpha=0.3)
+
+    # 12. Summary text
+    ax12 = fig.add_subplot(gs[2, 3])
+    ax12.axis('off')
+
+    summary_text = """COMPARISON SUMMARY
+=====================================
+
+Data Sources:
+  CCX:    data/liuxiu/ccx/
+  DIE:    data/liuxiu/die/
+  SOCKET: data/liuxiu/socket/
+
+Metrics Compared:
+  Level 1/2: Basic metrics
+  Level 3:   Sub-metrics
+
+Key Visualizations:
+  - CM_DATA: Bandwidth per DIE
+  - IOM_DATA: IO Requests per DIE
+  - DF_DATA_STREAM: Data flow metrics
+    + Level 3: Inv_PassD, VicBlkFull
+  - DF_DETAIL_LAT: Latency data
+    + Level 3: Latency histograms
+  - DF_QUEUE: Queue metrics
+    + Level 3: OCCUPANCY buckets
+
+Legend:
+  Blue   = CCX
+  Orange = DIE
+  Green  = SOCKET
+"""
+
+    ax12.text(0.05, 0.95, summary_text, transform=ax12.transAxes,
+             fontsize=10, verticalalignment='top', fontfamily='monospace',
+             bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.5))
+
+    plt.savefig(os.path.join(OUTPUT_DIR, 'complete_comparison_dashboard.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("    Saved: complete_comparison_dashboard.png")
+
+
+def main():
+    """Main function."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    print("=" * 70)
+    print("CCX vs DIE vs SOCKET Visualization")
+    print("=" * 70)
+
+    print("\n1. Visualizing CM_DATA...")
+    visualize_cm_data()
+
+    print("\n2. Visualizing DI_DATA...")
+    visualize_di_data()
+
+    print("\n3. Visualizing DF_DATA_STREAM with Level 3...")
+    visualize_df_data_stream()
+
+    print("\n4. Visualizing DF_DETAIL_LAT with Level 3...")
+    visualize_df_detail_lat()
+
+    print("\n5. Visualizing DF_QUEUE with Level 3...")
+    visualize_df_queue()
+
+    print("\n6. Creating summary dashboard...")
+    create_summary_dashboard()
+
+    print("\n" + "=" * 70)
+    print(f"All visualizations saved to: {OUTPUT_DIR}")
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    main()
